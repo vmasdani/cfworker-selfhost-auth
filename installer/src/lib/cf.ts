@@ -127,3 +127,19 @@ export async function dnsRecordsNamed(ctx: CfContext, zone: string, hostname: st
 	const all = await cf<DnsRecord[]>(ctx, ["dns", "records", "list", "--zone", zone, "--name", hostname]);
 	return (all ?? []).filter((r) => r.name === hostname);
 }
+
+export interface KvNamespace {
+	id: string;
+	title: string;
+}
+
+export async function findKv(ctx: CfContext, title: string): Promise<KvNamespace | null> {
+	const list = await cf<KvNamespace[]>(ctx, ["kv", "namespaces", "list"]);
+	return (list ?? []).find((n) => n.title === title) ?? null;
+}
+
+export async function createKv(ctx: CfContext, title: string): Promise<KvNamespace> {
+	const r = await cf<{ id?: string; title?: string }>(ctx, ["kv", "namespaces", "create", "--title", title]);
+	if (!r?.id) throw new Error("cf kv namespaces create returned no id");
+	return { id: r.id, title };
+}

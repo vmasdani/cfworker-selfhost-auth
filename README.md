@@ -6,7 +6,7 @@ Self-hosted authentication and secrets tools that run on Cloudflare Workers + D1
 |---|---|---|
 | [Tumbler Authenticator](apps/tumbler) | working: local vault, QR scan, import/export, accounts + encrypted sync; installer ready | Offline-capable PWA TOTP authenticator with optional end-to-end encrypted sync |
 | Secrets manager | planned | Infisical-like secrets management on Workers |
-| [NodeWarden](https://github.com/shuaiplus/NodeWarden) (third-party) | installer support planned | Bitwarden-compatible password manager server on Workers + D1. Installed from upstream at a pinned commit; LGPL-3.0; not affiliated with Bitwarden |
+| [NodeWarden](https://github.com/shuaiplus/NodeWarden) (third-party) | installer: KV variant | Bitwarden-compatible password manager server on Workers + D1. Installed from upstream at a pinned commit; LGPL-3.0; not affiliated with Bitwarden |
 
 Third-party apps are not vendored into this repository. The installer fetches them at the commit pinned in [`installer/src/apps.ts`](installer/src/apps.ts) and deploys them with their own tooling.
 
@@ -66,7 +66,9 @@ For Tumbler the installer:
 
 Re-running it upgrades in place. It never deletes anything.
 
-NodeWarden is not automated yet. Deploy it with its own Wrangler config, then immediately claim the admin account. NodeWarden makes the first registered account the admin, so do this immediately:
+For NodeWarden (`--apps nodewarden`, attachments in KV by default; `--variant r2` is not automated yet) the installer clones the commit pinned in `installer/src/apps.ts`, verifies it, runs `npm ci --ignore-scripts`, reuses or creates `nodewarden-db` and the KV namespace, writes its own Wrangler config next to upstream's (resource IDs, and workers.dev off with a custom domain), sets `JWT_SECRET` only if missing, deploys with Wrangler, and then claims the admin account in the same run. NodeWarden deploys with Wrangler, which has its own login: run `npx wrangler login` once (choose the same Cloudflare account), or set `CLOUDFLARE_API_TOKEN` to a token you created.
+
+To claim NodeWarden's admin separately (e.g. after a manual deploy), do it immediately: NodeWarden makes the first registered account the admin, so do this immediately:
 
 ```sh
 ./install.sh nodewarden-claim --url https://nodewarden.<you>.workers.dev

@@ -2,8 +2,8 @@
 //
 // Commands:
 //   install (default)  Install or upgrade apps on a Cloudflare account (./install-tumbler.ts).
-//       [--profile <cf profile>] [--account <id>] [--apps tumbler] [--domain <host> | --no-domain]
-//       [--dry-run] [--yes]
+//       [--profile <cf profile>] [--account <id>] [--apps tumbler,nodewarden] [--domain <host> | --no-domain]
+//       [--variant kv|r2] [--dry-run] [--yes]
 //     Idempotent; re-running upgrades in place. Never deletes resources.
 //   nodewarden-claim --url <worker url> [--username <name or email>] [--name <display name>] [--yes]
 //   tumbler-setup-admin --url <worker url> [--username <name>] [--yes]
@@ -11,11 +11,12 @@
 // Missing values are prompted for interactively. Passwords are always typed by the user
 // (hidden, twice); on non-TTY stdin they are read as lines, e.g. for CI.
 //
-// NodeWarden deploys with its own Wrangler config and is not automated yet: deploy it, then run
-// nodewarden-claim right away.
+// NodeWarden (./install-nodewarden.ts) deploys from its pinned upstream commit with Wrangler, and its
+// admin is claimed in the same run, right after deploy.
 
 import { parseArgs } from "node:util";
 import { APPS } from "./apps.ts";
+import { installNodewarden, type NodewardenVariant } from "./install-nodewarden.ts";
 import { installTumbler, normalizeDomain } from "./install-tumbler.ts";
 import { CfError, cfRun, whoami, type CfContext } from "./lib/cf.ts";
 import { MIN_MASTER_PASSWORD_LENGTH, validateMasterPassword } from "./lib/password.ts";
@@ -26,12 +27,12 @@ import { assertSetupNeeded, normalizeTumblerUsername, printTumblerSummary, setup
 const info = (msg: string) => process.stderr.write(`${msg}\n`);
 
 const USAGE = `Usage:
-  ./install.sh [install] [--profile <cf profile>] [--account <id>] [--apps tumbler]
-               [--domain <host> | --no-domain] [--dry-run] [--yes]
+  ./install.sh [install] [--profile <cf profile>] [--account <id>] [--apps tumbler,nodewarden]
+               [--domain <host> | --no-domain] [--variant kv|r2] [--dry-run] [--yes]
   ./install.sh nodewarden-claim [--url <worker url>] [--username <name or email>] [--name <display name>] [--yes]
   ./install.sh tumbler-setup-admin [--url <worker url>] [--username <name>] [--yes]
 
-Apps: ${APPS.map((a) => a.id).join(", ")} (install automates tumbler; nodewarden: deploy it, then nodewarden-claim)`;
+Apps: ${APPS.map((a) => a.id).join(", ")}. --domain applies when installing one app; otherwise you are asked per app.`;
 
 async function main(argv: string[]): Promise<number> {
 	const [first, ...others] = argv;
@@ -124,6 +125,7 @@ async function install(args: string[]): Promise<number> {
 			account: { type: "string" },
 			apps: { type: "string" },
 			domain: { type: "string" },
+			variant: { type: "string" },
 			"no-domain": { type: "boolean" },
 			"dry-run": { type: "boolean" },
 			yes: { type: "boolean", short: "y" },
@@ -151,40 +153,81 @@ async function install(args: string[]): Promise<number> {
 	info(`✓ account: ${account.name}${profile ? ` (profile ${profile})` : ""}`);
 
 	// 2. apps
-	const apps = (values.apps ?? prompt("Apps to install:", "tumbler") ?? "").split(",").map((a) => a.trim()).filter(Boolean);
+	const apps = (values.apps ?? prompt("Apps to install (tumbler, nodewarden):", "tumbler") ?? "")
+		.split(",").map((a) => a.trim().toLowerCase()).filter(Boolean);
+	for (const a of apps) if (a !== "tumbler" && a !== "nodewarden") throw new ClaimError(`Unknown app: ${a}`);
+	if (!apps.length) throw new ClaimError("Nothing to install.");
+	const variant = (values.variant ?? "kv") as NodewardenVariant;
+	if (variant !== "kv" && variant !== "r2") throw new ClaimError("--variant must be kv or r2");
+
+	// 3. domains (--domain applies when installing a single app)
+	const domains: Record<string, string | undefined> = {};
 	for (const a of apps) {
-		if (a === "nodewarden") throw new ClaimError("NodeWarden is not automated yet: deploy it with its own Wrangler config, then run ./install.sh nodewarden-claim right away.");
-		if (a !== "tumbler") throw new ClaimError(`Unknown app: ${a}`);
+		const name = a === "tumbler" ? "Tumbler" : "NodeWarden";
+		const input = values["no-domain"]
+			? ""
+			: ((apps.length === 1 ? values.domain : undefined) ??
+				prompt(`Custom domain for ${name} (blank = workers.dev), e.g. ${a}.example.com:`, "")?.trim() ?? "");
+		domains[a] = input ? normalizeDomain(input) : undefined;
 	}
-	if (!apps.includes("tumbler")) throw new ClaimError("Nothing to install.");
 
-	// 3. domain
-	const domainInput = values["no-domain"] ? "" : (values.domain ?? prompt("Custom domain for Tumbler (blank = workers.dev), e.g. tumbler.example.com:", "")?.trim() ?? "");
-	const domain = domainInput ? normalizeDomain(domainInput) : undefined;
-
-	info(`\nPlan: ${dryRun ? "DRY RUN, nothing is created or uploaded. " : ""}Install/upgrade Tumbler on "${account.name}"` +
-		`${domain ? ` at https://${domain}` : " on workers.dev"}.`);
+	info(`\nPlan: ${dryRun ? "DRY RUN, nothing is created or uploaded. " : ""}On "${account.name}":`);
+	for (const a of apps) {
+		info(`  • ${a === "tumbler" ? "Tumbler" : `NodeWarden (${variant.toUpperCase()} attachments)`} ${domains[a] ? `at https://${domains[a]}` : "on workers.dev"}`);
+	}
+	if (apps.includes("nodewarden") && !dryRun) {
+		info("  NodeWarden makes the first registered account the admin, so its admin is claimed right after deploy.");
+	}
 	if (!dryRun && !values.yes && !yesNo("Proceed?")) {
 		info("Aborted. Nothing was changed.");
 		return 1;
 	}
 
-	const result = await installTumbler({ ctx, domain, dryRun, yes: !!values.yes, confirm: yesNo, log: info });
-	if (dryRun || !result.url) return 0;
+	for (const a of apps) {
+		info(`\n— ${a === "tumbler" ? "Tumbler" : "NodeWarden"} —`);
+		if (a === "tumbler") await installTumblerApp(ctx, domains[a], dryRun, !!values.yes);
+		else await installNodewardenApp(ctx, domains[a], variant, dryRun, !!values.yes);
+	}
+	return 0;
+}
 
-	// 4. first admin
+async function installTumblerApp(ctx: CfContext, domain: string | undefined, dryRun: boolean, yes: boolean): Promise<void> {
+	const result = await installTumbler({ ctx, domain, dryRun, yes, confirm: yesNo, log: info });
+	if (dryRun || !result.url) return;
 	const res = await fetch(`${result.url}/api/setup`);
 	const setup = (await res.json().catch(() => ({}))) as { needed?: boolean };
 	if (!setup.needed) {
-		info(`\n✓ Tumbler is up to date at ${result.url}. Accounts already exist; invite users from Settings → Sync.`);
-		return 0;
+		info(`✓ Tumbler is up to date at ${result.url}. Accounts already exist; invite users from Settings → Sync.`);
+		return;
 	}
-	info("\nCreate the first admin account.");
+	info("\nCreate the first Tumbler admin account.");
 	const username = normalizeTumblerUsername(prompt("Admin username:", "admin")?.trim() ?? "");
 	const password = await readNewPassword(username);
 	info("Deriving keys and creating the admin account…");
 	printTumblerSummary(await setupTumblerAdmin({ url: result.url, setupToken: result.setupToken!, username, password }));
-	return 0;
+}
+
+async function installNodewardenApp(ctx: CfContext, domain: string | undefined, variant: NodewardenVariant, dryRun: boolean, yes: boolean): Promise<void> {
+	const result = await installNodewarden({ ctx, domain, variant, dryRun, yes, confirm: yesNo, log: info });
+	if (dryRun || !result.url) return;
+	try {
+		await assertClaimable(result.url);
+	} catch (e) {
+		if (e instanceof ClaimError && /already has an account/.test(e.message)) {
+			info(`✓ NodeWarden is up to date at ${result.url}. Its admin account already exists.`);
+			info("  If you did not create that account yourself, do not use this instance: wipe nodewarden-db and its KV namespace, then redeploy.");
+			return;
+		}
+		throw e;
+	}
+	info("\nClaim the NodeWarden admin account now.");
+	const username = prompt("Admin login: a username (e.g. admin) or your own email (e.g. you@proton.me):", "admin")?.trim() ?? "";
+	const email = loginFromUsername(username, result.url);
+	const name = prompt("Display name:", username.split("@")[0])?.trim();
+	info(`Admin login will be: ${email} (Bitwarden clients sign in with an email-shaped login; no mail is sent to it).`);
+	const password = await readNewPassword(email);
+	info("Deriving keys and registering the admin account…");
+	printClaimSummary(await claimFirstAdmin({ url: result.url, email, password, name: name || undefined }));
 }
 
 async function readNewPassword(login: string): Promise<string> {
