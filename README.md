@@ -4,7 +4,7 @@ Self-hosted authentication and secrets tools that run on Cloudflare Workers + D1
 
 | App | Status | Description |
 |---|---|---|
-| [Tumbler Authenticator](apps/tumbler) | working: local vault, QR scan, import/export, accounts + encrypted sync; not deployed yet | Offline-capable PWA TOTP authenticator with optional end-to-end encrypted sync |
+| [Tumbler Authenticator](apps/tumbler) | working: local vault, QR scan, import/export, accounts + encrypted sync; installer ready | Offline-capable PWA TOTP authenticator with optional end-to-end encrypted sync |
 | Secrets manager | planned | Infisical-like secrets management on Workers |
 | [NodeWarden](https://github.com/shuaiplus/NodeWarden) (third-party) | installer support planned | Bitwarden-compatible password manager server on Workers + D1. Installed from upstream at a pinned commit; LGPL-3.0; not affiliated with Bitwarden |
 
@@ -47,12 +47,26 @@ See [docs/threat-model.md](docs/threat-model.md).
 ## Install
 
 ```sh
-./install.sh
+./install.sh                     # interactive
+./install.sh --profile <cf profile> --apps tumbler --domain tumbler.example.com
+./install.sh ... --dry-run       # check everything, build, create/upload nothing
 ```
 
-Requires [Bun](https://bun.sh), Node.js 22.18+ and the [`cf` CLI](https://developers.cloudflare.com/cf/) (`npm install --global cf`). The installer selects the Cloudflare account and apps, reuses or creates D1 databases, applies migrations, deploys, and creates the first admin. The full flow is not implemented yet.
+Requires [Bun](https://bun.sh), Node.js 22.18+ and the [`cf` CLI](https://developers.cloudflare.com/cf/) (`npm install --global cf`), signed in (`cf auth login`, optionally `--profile <name>`).
 
-Available now: claim the NodeWarden admin account right after deploying it. NodeWarden makes the first registered account the admin, so do this immediately:
+For Tumbler the installer:
+
+1. picks the `cf` profile and Cloudflare account;
+2. checks the custom domain: its zone must be in the account and the hostname must have no DNS records (leave it blank to use workers.dev);
+3. reuses the D1 database `tumbler-db` by name, or creates it after asking;
+4. applies D1 migrations;
+5. sets Worker secrets: `SERVER_SECRET` only if missing (it is never rotated: every login depends on it) and a fresh one-time `ADMIN_SETUP_TOKEN`. Values pass through a private temp file to `cf deploy --secrets-file` and are never printed;
+6. deploys and waits until the site answers (a new custom domain's certificate can take a few minutes);
+7. if the server has no users yet, asks for the first admin's username and password and prints the recovery key once.
+
+Re-running it upgrades in place. It never deletes anything.
+
+NodeWarden is not automated yet. Deploy it with its own Wrangler config, then immediately claim the admin account. NodeWarden makes the first registered account the admin, so do this immediately:
 
 ```sh
 ./install.sh nodewarden-claim --url https://nodewarden.<you>.workers.dev
@@ -60,7 +74,7 @@ Available now: claim the NodeWarden admin account right after deploying it. Node
 
 It asks for the admin login (a username such as `admin`, which becomes `admin@<worker host>`, or your own email such as `you@proton.me`) a display name, and a master password you choose (typed hidden, twice; 12+ characters, a memorable passphrase works well). It derives the keys locally, registers the account, verifies it by logging in, and never prints or stores the password. It refuses if the instance already has an account.
 
-Tumbler's first admin, after deploying with `SERVER_SECRET` and `ADMIN_SETUP_TOKEN` set and migrations applied:
+To create Tumbler's first admin separately (e.g. after a manual deploy):
 
 ```sh
 TUMBLER_SETUP_TOKEN=<token> ./install.sh tumbler-setup-admin --url https://tumbler.<you>.workers.dev
