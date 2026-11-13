@@ -16,6 +16,8 @@ export default defineConfig({
 			// Server-side pepper: HMAC key for auth verifiers and decoy pre-login salts,
 			// and encryption key for account-login TOTP secrets.
 			SERVER_SECRET: bindings.secret(),
+			// One-time token for creating the first admin (POST /api/setup). Useless once any user exists.
+			ADMIN_SETUP_TOKEN: bindings.secret(),
 		},
 	},
 });

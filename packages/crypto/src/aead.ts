@@ -20,7 +20,7 @@ export function importAesKey(raw: Uint8Array, extractable = false): Promise<Cryp
 	return crypto.subtle.importKey("raw", raw as BufferSource, "AES-GCM", extractable, ["encrypt", "decrypt"]);
 }
 
-function params(iv: Uint8Array, aad?: string): AesGcmParams {
+function params(iv: Uint8Array, aad?: string): { name: "AES-GCM"; iv: BufferSource; additionalData?: BufferSource } {
 	return aad === undefined
 		? { name: "AES-GCM", iv: iv as BufferSource }
 		: { name: "AES-GCM", iv: iv as BufferSource, additionalData: utf8.encode(aad) as BufferSource };

@@ -14,6 +14,7 @@
       "dependencies": {
         "@cfsa/crypto": "workspace:*",
         "@cfsa/importers": "workspace:*",
+        "@cfsa/server-kit": "workspace:*",
         "@cfsa/totp": "workspace:*",
         "hono": "^4.13.18",
         "jsqr": "^1.4.0",
@@ -31,6 +32,9 @@
     },
     "installer": {
       "name": "@cfsa/installer",
+      "dependencies": {
+        "@cfsa/crypto": "workspace:*",
+      },
       "devDependencies": {
         "@types/bun": "^1.4.4",
       },
@@ -46,6 +50,12 @@
     },
     "packages/server-kit": {
       "name": "@cfsa/server-kit",
+      "dependencies": {
+        "@cfsa/crypto": "workspace:*",
+      },
+      "devDependencies": {
+        "@cloudflare/workers-types": "^5.20261113.1",
+      },
     },
     "packages/totp": {
       "name": "@cfsa/totp",
@@ -125,6 +135,8 @@
     "@cloudflare/workerd-linux-arm64": ["@cloudflare/workerd-linux-arm64@1.20261110.1", "", { "os": "linux", "cpu": "arm64" }, "sha512-0l+JyYWOhEzTs7yOkIdf1ZzcXd9WalPZ1kD0bBAobFvDhO/1jBnQkS4rzzyUkGV7g8pb3dkfrBP9c2ZiRLOfdw=="],
 
     "@cloudflare/workerd-windows-64": ["@cloudflare/workerd-windows-64@1.20261110.1", "", { "os": "win32", "cpu": "x64" }, "sha512-zP8IGyWvohyJhbNjHOnTA9anRQtGN7X01T/dG+R9IA4vu2egRODsD02aoYzv0a0qImjt7tTpOOA+uVotDJPcSA=="],
+
+    "@cloudflare/workers-types": ["@cloudflare/workers-types@5.20261113.1", "", {}, "sha512-FhF8hRtsQCr/BWZyUN7wm2x+jqAOkRIpLOW+2fJu5OQyIDOv+c3PxY8duEAkOYXuprLImxjW+PHTbvz9+Px5cw=="],
 
     "@cspotcode/source-map-support": ["@cspotcode/source-map-support@0.8.1", "", { "dependencies": { "@jridgewell/trace-mapping": "0.3.9" } }, "sha512-IchNf6dN4tHoMFIn/7OE8LWZ19Y6q/67Bmf6vnGREv8RSbBVb9LPJxEcnwrcwX6ixSvaiGoomAUvu4YSxXrVgw=="],
 

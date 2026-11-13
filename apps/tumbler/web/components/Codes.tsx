@@ -3,7 +3,7 @@ import { useEffect, useState } from "preact/hooks";
 import { copySecret } from "../lib/clipboard.ts";
 import { matchesQuery, type Entry } from "../lib/entries.ts";
 import { codeFor, entryCounter, formatCode } from "../lib/otp-keys.ts";
-import { listEntries, saveEntries, type Settings } from "../lib/vault.ts";
+import { listEntries, saveEntries, vaultEvents, type Settings } from "../lib/vault.ts";
 import { Avatar, Timer, TopBar, useNow, useToast } from "./ui.tsx";
 
 interface Props {
@@ -21,7 +21,12 @@ export function Codes({ settings, onAdd, onEdit, onSettings, onLock }: Props) {
 	const now = useNow();
 
 	const reload = () => listEntries().then(setEntries);
-	useEffect(() => { void reload(); }, []);
+	useEffect(() => {
+		void reload();
+		const onRemote = () => void reload();
+		vaultEvents.addEventListener("remote", onRemote);
+		return () => vaultEvents.removeEventListener("remote", onRemote);
+	}, []);
 
 	async function copy(code: string) {
 		try {

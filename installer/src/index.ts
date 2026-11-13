@@ -10,25 +10,29 @@
 //   5. For each D1/R2/KV resource: look up by name, reuse or create. Never delete.
 //   6. Generate missing secrets (never printed), apply migrations, deploy.
 //   7. First admin, credentials printed ONCE with a warning to save them in a password manager:
-//      - installer-bootstrap: generate credentials + recovery key locally, run the KDF locally,
-//        insert into D1.
+//      - setup-endpoint (Tumbler): user-chosen password, keys derived locally, recovery key printed
+//        once, via the app's one-time setup endpoint (./tumbler.ts).
 //      - bitwarden-register: claim via the app's API immediately after deploy (./nodewarden.ts).
 //
 // Implemented commands:
 //   nodewarden-claim --url <worker url> [--username <name or email>] [--name <display name>] [--yes]
-//   Missing values are prompted for interactively. The master password is always typed by the
-//   user (hidden, twice); on non-TTY stdin it is read as a line, e.g. for CI.
+//   tumbler-setup-admin --url <worker url> [--username <name>] [--yes]
+//     Setup token from TUMBLER_SETUP_TOKEN, or prompted (hidden).
+//   Missing values are prompted for interactively. Passwords are always typed by the user
+//   (hidden, twice); on non-TTY stdin they are read as lines, e.g. for CI.
 
 import { parseArgs } from "node:util";
-
-const info = (msg: string) => process.stderr.write(`${msg}\n`);
 import { APPS } from "./apps.ts";
 import { MIN_MASTER_PASSWORD_LENGTH, validateMasterPassword } from "./lib/password.ts";
 import { CancelledError, readHidden } from "./lib/tty.ts";
 import { assertClaimable, ClaimError, claimFirstAdmin, loginFromUsername, printClaimSummary } from "./nodewarden.ts";
+import { assertSetupNeeded, normalizeTumblerUsername, printTumblerSummary, setupTumblerAdmin } from "./tumbler.ts";
+
+const info = (msg: string) => process.stderr.write(`${msg}\n`);
 
 const USAGE = `Usage:
   ./install.sh nodewarden-claim [--url <worker url>] [--username <name or email>] [--name <display name>] [--yes]
+  ./install.sh tumbler-setup-admin [--url <worker url>] [--username <name>] [--yes]
 
 Full interactive install is not implemented yet. Planned apps: ${APPS.map((a) => a.id).join(", ")}`;
 
@@ -69,6 +73,28 @@ async function main(argv: string[]): Promise<number> {
 			info("Deriving keys and registering the admin account…");
 			const result = await claimFirstAdmin({ url, email, password, name: name || undefined });
 			printClaimSummary(result);
+			return 0;
+		}
+		case "tumbler-setup-admin": {
+			const { values } = parseArgs({
+				args: rest,
+				options: { url: { type: "string" }, username: { type: "string" }, yes: { type: "boolean", short: "y" } },
+			});
+			const url = values.url ?? prompt("Tumbler URL:")?.trim();
+			if (!url) {
+				console.error(USAGE);
+				return 2;
+			}
+			await assertSetupNeeded(url);
+			const setupToken = process.env.TUMBLER_SETUP_TOKEN || (await readHidden("ADMIN_SETUP_TOKEN:"));
+			const username = normalizeTumblerUsername(values.username ?? prompt("Admin username:", "admin")?.trim() ?? "");
+			const password = await readNewPassword(username);
+			if (!values.yes && prompt(`Create Tumbler admin "${username}" now? [y/N]`)?.trim().toLowerCase() !== "y") {
+				info("Aborted. Nothing was created.");
+				return 1;
+			}
+			info("Deriving keys and creating the admin account…");
+			printTumblerSummary(await setupTumblerAdmin({ url, setupToken, username, password }));
 			return 0;
 		}
 		default:

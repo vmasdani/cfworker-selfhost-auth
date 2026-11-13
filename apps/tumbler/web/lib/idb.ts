@@ -46,6 +46,12 @@ export const records = {
 		(await run<EntryRecord[]>(["entries"], "readonly", (tx) => tx.objectStore("entries").getAll())) ?? [],
 	get: (id: string) =>
 		run<EntryRecord>(["entries"], "readonly", (tx) => tx.objectStore("entries").get(id) as IDBRequest<EntryRecord>),
+	replaceAll: (recs: EntryRecord[]) =>
+		run(["entries"], "readwrite", (tx) => {
+			const st = tx.objectStore("entries");
+			st.clear();
+			for (const r of recs) st.put(r);
+		}),
 	putMany: (recs: EntryRecord[]) =>
 		run(["entries"], "readwrite", (tx) => {
 			const s = tx.objectStore("entries");

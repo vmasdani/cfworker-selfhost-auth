@@ -80,3 +80,23 @@ describe("aead", () => {
 		expect(a.ct).not.toBe(b.ct);
 	});
 });
+
+describe("account material", () => {
+	test("recovery key format and parse tolerance", async () => {
+		const { generateRecoveryKey, parseRecoveryKey } = await import("../src/index.ts");
+		const { bytes, display } = generateRecoveryKey();
+		expect(display).toMatch(/^[0-9A-HJKMNP-TV-Z]{4}(-[0-9A-HJKMNP-TV-Z]{4}){7}$/);
+		expect(timingSafeEqual(parseRecoveryKey(display.toLowerCase().replace(/-/g, " ")), bytes)).toBe(true);
+		expect(() => parseRecoveryKey("ABCD")).toThrow();
+	});
+	test("password and recovery key both unwrap the vault key", async () => {
+		const { makeAccountMaterial, parseRecoveryKey, unwrapWithRecovery } = await import("../src/index.ts");
+		const vk = generateVaultKey();
+		const { material, recoveryKey } = await makeAccountMaterial("long account password", vk, 1000);
+		const { wrapKey, authKey } = await deriveKeys("long account password", material.kdf);
+		expect(toB64(authKey)).toBe(material.authKey);
+		expect(timingSafeEqual(await unwrapVaultKey(wrapKey, material.wrappedVaultKey), vk)).toBe(true);
+		expect(timingSafeEqual(await unwrapWithRecovery(parseRecoveryKey(recoveryKey), material.recoveryWrappedKey), vk)).toBe(true);
+		expect(material.recoveryAuthKey).not.toBe(material.authKey);
+	});
+});

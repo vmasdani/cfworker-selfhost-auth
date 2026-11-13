@@ -2,8 +2,16 @@
 	"name": "@cfsa/server-kit",
 	"private": true,
 	"type": "module",
-	"exports": { ".": "./src/index.ts" },
+	"exports": {
+		".": "./src/index.ts"
+	},
 	"scripts": {
 		"typecheck": "tsc -p ."
+	},
+	"dependencies": {
+		"@cfsa/crypto": "workspace:*"
+	},
+	"devDependencies": {
+		"@cloudflare/workers-types": "^5.20261113.1"
 	}
 }

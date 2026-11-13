@@ -1,6 +1,8 @@
 import { useState } from "preact/hooks";
 import { MIN_PIN_LENGTH, validatePassword, validatePin } from "../lib/vault-core.ts";
-import { changePassword, removePin, setPin, type Settings } from "../lib/vault.ts";
+import { changePassword } from "../lib/account.ts";
+import { removePin, setPin, type Settings } from "../lib/vault.ts";
+import { AccountSection } from "./AccountSection.tsx";
 import { TopBar } from "./ui.tsx";
 
 interface Props {
@@ -12,15 +14,19 @@ interface Props {
 	onImport: () => void;
 	onExport: () => void;
 	onBack: () => void;
+	invite?: string;
 }
 
 const AUTO_LOCK = [1, 2, 5, 15, 30, 60];
 const CLIPBOARD = [0, 15, 30, 60, 120];
 
-export function SettingsView({ settings, hasPin, onSettings, onPinChanged, onLock, onImport, onExport, onBack }: Props) {
+export function SettingsView({ settings, hasPin, onSettings, onPinChanged, onLock, onImport, onExport, onBack, invite }: Props) {
 	return (
 		<div class="shell">
 			<TopBar title="Settings" onBack={onBack} />
+
+			<h2>Sync</h2>
+			<AccountSection invite={invite} onPinMaybeRemoved={() => void onPinChanged()} />
 
 			<h2>Security</h2>
 			<div class="settings-group">
@@ -60,8 +66,8 @@ export function SettingsView({ settings, hasPin, onSettings, onPinChanged, onLoc
 			<h2>About</h2>
 			<div class="settings-group">
 				<p class="hint">
-					Tumbler Authenticator. Codes are encrypted with AES-256-GCM and stored only on this device.
-					Sync is not set up yet.
+					Tumbler Authenticator. Codes are encrypted with AES-256-GCM on this device. With sync, the server
+					stores only ciphertext.
 				</p>
 			</div>
 		</div>
@@ -147,7 +153,7 @@ function PasswordSection() {
 			setCurrent("");
 			setNext("");
 			setConfirm("");
-			setMsg({ error: false, text: "Master password changed. Update it in your password manager." });
+			setMsg({ error: false, text: "Password changed. Update it in your password manager." });
 		} catch (e) {
 			setMsg({ error: true, text: e instanceof Error ? e.message : String(e) });
 		} finally {

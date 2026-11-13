@@ -7,6 +7,7 @@ import { SettingsView } from "./components/SettingsView.tsx";
 import { Setup } from "./components/Setup.tsx";
 import { Unlock } from "./components/Unlock.tsx";
 import type { Entry } from "./lib/entries.ts";
+import { syncNow } from "./lib/account.ts";
 import * as vault from "./lib/vault.ts";
 
 type Status = "loading" | "setup" | "locked" | "unlocked";
@@ -26,6 +27,7 @@ export function App() {
 	const [hasPin, setHasPin] = useState(false);
 	const [view, setView] = useState<View>({ name: "list" });
 	const [settings, setSettings] = useState<vault.Settings>(vault.DEFAULT_SETTINGS);
+	const [invite, setInvite] = useState<string | undefined>(readInviteFromHash);
 
 	const refreshState = useCallback(async () => {
 		const s = await vault.vaultState();
@@ -49,9 +51,15 @@ export function App() {
 	}, [refreshState]);
 
 	useAutoLock(status === "unlocked", settings.autoLockMinutes, doLock);
+	useAutoSync(status === "unlocked");
+
+	// An invite link opened while a vault exists goes to Settings → Sync.
+	useEffect(() => {
+		if (invite && status === "unlocked") setView({ name: "settings" });
+	}, [invite, status]);
 
 	if (status === "loading") return null;
-	if (status === "setup") return <Setup onDone={() => { void refreshState(); setStatus("unlocked"); }} />;
+	if (status === "setup") return <Setup invite={invite} onDone={() => { setInvite(undefined); void refreshState(); setStatus("unlocked"); }} />;
 	if (status === "locked") {
 		return <Unlock hasPin={hasPin} onUnlocked={() => setStatus("unlocked")} onPinStateChange={refreshState} />;
 	}
@@ -80,7 +88,8 @@ export function App() {
 					onLock={doLock}
 					onImport={() => setView({ name: "import" })}
 					onExport={() => setView({ name: "export" })}
-					onBack={() => setView({ name: "list" })}
+					onBack={() => { setInvite(undefined); setView({ name: "list" }); }}
+					invite={invite}
 				/>
 			);
 		default:
@@ -94,6 +103,40 @@ export function App() {
 				/>
 			);
 	}
+}
+
+/** Reads and removes "#invite=<token>" so the token does not linger in the address bar or history. */
+function readInviteFromHash(): string | undefined {
+	const m = /^#invite=([A-Za-z0-9_-]{20,})$/.exec(location.hash);
+	if (!m) return undefined;
+	history.replaceState(null, "", location.pathname + location.search);
+	return m[1];
+}
+
+/** Sync on unlock, shortly after local edits, when coming back online, and every 5 minutes. */
+function useAutoSync(active: boolean) {
+	useEffect(() => {
+		if (!active) return;
+		let timer: ReturnType<typeof setTimeout> | undefined;
+		const soon = () => {
+			clearTimeout(timer);
+			timer = setTimeout(() => void syncNow(), 1500);
+		};
+		const now = () => void syncNow();
+		void syncNow();
+		vault.vaultEvents.addEventListener("change", soon);
+		window.addEventListener("online", now);
+		const visible = () => { if (!document.hidden) now(); };
+		document.addEventListener("visibilitychange", visible);
+		const interval = setInterval(now, 5 * 60_000);
+		return () => {
+			clearTimeout(timer);
+			clearInterval(interval);
+			vault.vaultEvents.removeEventListener("change", soon);
+			window.removeEventListener("online", now);
+			document.removeEventListener("visibilitychange", visible);
+		};
+	}, [active]);
 }
 
 function useAutoLock(active: boolean, minutes: number, lock: () => void) {

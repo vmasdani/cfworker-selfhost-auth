@@ -4,7 +4,7 @@ Self-hosted authentication and secrets tools that run on Cloudflare Workers + D1
 
 | App | Status | Description |
 |---|---|---|
-| [Tumbler Authenticator](apps/tumbler) | local vault, QR scan, import/export working; sync pending | Offline-capable PWA TOTP authenticator with optional end-to-end encrypted sync |
+| [Tumbler Authenticator](apps/tumbler) | working: local vault, QR scan, import/export, accounts + encrypted sync; not deployed yet | Offline-capable PWA TOTP authenticator with optional end-to-end encrypted sync |
 | Secrets manager | planned | Infisical-like secrets management on Workers |
 | [NodeWarden](https://github.com/shuaiplus/NodeWarden) (third-party) | installer support planned | Bitwarden-compatible password manager server on Workers + D1. Installed from upstream at a pinned commit; LGPL-3.0; not affiliated with Bitwarden |
 
@@ -60,6 +60,14 @@ Available now: claim the NodeWarden admin account right after deploying it. Node
 
 It asks for the admin login (a username such as `admin`, which becomes `admin@<worker host>`, or your own email such as `you@proton.me`) a display name, and a master password you choose (typed hidden, twice; 12+ characters, a memorable passphrase works well). It derives the keys locally, registers the account, verifies it by logging in, and never prints or stores the password. It refuses if the instance already has an account.
 
+Tumbler's first admin, after deploying with `SERVER_SECRET` and `ADMIN_SETUP_TOKEN` set and migrations applied:
+
+```sh
+TUMBLER_SETUP_TOKEN=<token> ./install.sh tumbler-setup-admin --url https://tumbler.<you>.workers.dev
+```
+
+You choose the username and password; keys are derived locally and the recovery key is printed once. The setup endpoint works only while the server has no users. Everyone else joins with single-use invite links from Settings → Sync → Invite users.
+
 ## Development
 
 ```sh
@@ -67,6 +75,14 @@ bun install
 bun run dev:tumbler     # local dev server (cf dev)
 bun run typecheck
 bun test
+
+# Tumbler API end to end, against a local server with an empty database
+cd apps/tumbler
+cp .dev.vars.example .dev.vars          # then put random values in it
+bun run build && bunx vite preview --port 4173 &
+curl -s localhost:4173/api/setup >/dev/null   # creates the local D1 file
+bun run db:migrate:local
+bun run test:api http://localhost:4173 "$(grep ADMIN_SETUP_TOKEN .dev.vars | cut -d= -f2-)"
 bun run --cwd apps/tumbler icons   # regenerate logo + PWA icons into apps/tumbler/public
 ```
 

@@ -39,14 +39,15 @@ export async function deriveRootKey(secret: string, params: KdfParams): Promise<
 	return new Uint8Array(bits);
 }
 
-async function hkdf(root: Uint8Array, info: string): Promise<Uint8Array> {
+/** HKDF-SHA256 (zero salt) of high-entropy input key material. */
+export async function hkdf(root: Uint8Array, info: string, bits = 256): Promise<Uint8Array> {
 	const base = await crypto.subtle.importKey("raw", root as BufferSource, "HKDF", false, ["deriveBits"]);
-	const bits = await crypto.subtle.deriveBits(
+	const out = await crypto.subtle.deriveBits(
 		{ name: "HKDF", hash: "SHA-256", salt: new Uint8Array(32), info: utf8.encode(info) as BufferSource },
 		base,
-		256,
+		bits,
 	);
-	return new Uint8Array(bits);
+	return new Uint8Array(out);
 }
 
 export interface Subkeys {

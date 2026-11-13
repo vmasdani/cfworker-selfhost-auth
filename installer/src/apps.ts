@@ -26,8 +26,12 @@ export interface Variant {
 }
 
 export type FirstAdmin =
-	/** Installer generates credentials + recovery key locally, inserts into D1, prints them once. */
-	| { kind: "installer-bootstrap" }
+	/**
+	 * The app exposes a one-time setup endpoint guarded by a generated secret and usable only while it
+	 * has no users. The installer derives all keys locally, the user chooses the password, and the
+	 * recovery key is printed once (installer command `command`).
+	 */
+	| { kind: "setup-endpoint"; command: string; tokenSecret: string }
 	/**
 	 * Installer registers the first account through the app's Bitwarden-compatible
 	 * `POST /api/accounts/register` right after deploy, using client-side Bitwarden key
@@ -67,9 +71,12 @@ export const APPS: AppDef[] = [
 				deploy: ["cf", "deploy"],
 			},
 		],
-		secrets: [{ name: "SERVER_SECRET", generate: "random-base64-32" }],
-		firstAdmin: { kind: "installer-bootstrap" },
-		notes: [],
+		secrets: [
+			{ name: "SERVER_SECRET", generate: "random-base64-32", minLength: 32 },
+			{ name: "ADMIN_SETUP_TOKEN", generate: "random-base64-32", minLength: 32 },
+		],
+		firstAdmin: { kind: "setup-endpoint", command: "tumbler-setup-admin", tokenSecret: "ADMIN_SETUP_TOKEN" },
+		notes: ["Apply D1 migrations (apps/tumbler/migrations) before first use."],
 	},
 	{
 		id: "nodewarden",

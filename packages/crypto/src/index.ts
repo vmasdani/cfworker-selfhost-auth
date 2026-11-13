@@ -4,3 +4,4 @@ export * from "./aead.ts";
 export * from "./encoding.ts";
 export * from "./kdf.ts";
 export * from "./keys.ts";
+export * from "./account.ts";

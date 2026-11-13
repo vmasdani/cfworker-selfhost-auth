@@ -1,9 +1,50 @@
 import { useState } from "preact/hooks";
 import { createVault } from "../lib/vault.ts";
 import { MIN_PASSWORD_LENGTH, MIN_PIN_LENGTH, validatePassword, validatePin } from "../lib/vault-core.ts";
+import { JoinForm, RecoverForm, RecoveryKeyView, SignInForm } from "./AccountForms.tsx";
 import { Brand } from "./ui.tsx";
 
-export function Setup({ onDone }: { onDone: () => void }) {
+type Mode = "create" | "signin" | "join" | "recover";
+
+export function Setup({ onDone, invite }: { onDone: () => void; invite?: string }) {
+	const [mode, setMode] = useState<Mode>(invite ? "join" : "create");
+	const [recoveryKey, setRecoveryKey] = useState<string | null>(null);
+	const subtitle: Record<Mode, string> = {
+		create: "Create a local vault on this device",
+		signin: "Sign in to your sync account",
+		join: "Create your account from an invite",
+		recover: "Recover your account",
+	};
+	if (recoveryKey) {
+		return (
+			<div class="centered">
+				<div class="card">
+					<Brand subtitle="Account created" />
+					<RecoveryKeyView recoveryKey={recoveryKey} onDone={onDone} />
+				</div>
+			</div>
+		);
+	}
+	return (
+		<div class="centered">
+			<div class="card">
+				<Brand subtitle={subtitle[mode]} />
+				{mode === "create" && <CreateVault onDone={onDone} />}
+				{mode === "signin" && <SignInForm onDone={onDone} />}
+				{mode === "join" && <JoinForm invite={invite} createLocal onRecoveryKey={setRecoveryKey} />}
+				{mode === "recover" && <RecoverForm onDone={onDone} />}
+				<div class="mode-links">
+					{mode !== "create" && <button class="link" onClick={() => setMode("create")}>Use without an account</button>}
+					{mode !== "signin" && <button class="link" onClick={() => setMode("signin")}>Sign in to sync</button>}
+					{mode !== "join" && <button class="link" onClick={() => setMode("join")}>I have an invite link</button>}
+					{mode === "signin" && <button class="link" onClick={() => setMode("recover")}>Forgot password?</button>}
+				</div>
+			</div>
+		</div>
+	);
+}
+
+function CreateVault({ onDone }: { onDone: () => void }) {
 	const [password, setPassword] = useState("");
 	const [confirm, setConfirm] = useState("");
 	const [usePin, setUsePin] = useState(false);
@@ -32,9 +73,7 @@ export function Setup({ onDone }: { onDone: () => void }) {
 	}
 
 	return (
-		<div class="centered">
-			<form class="card" onSubmit={submit}>
-				<Brand subtitle="Create a local vault on this device" />
+		<form onSubmit={submit}>
 				<input type="text" name="username" autocomplete="username" value="Tumbler local vault" hidden readOnly />
 
 				<label for="pw">Master password</label>
@@ -71,6 +110,5 @@ export function Setup({ onDone }: { onDone: () => void }) {
 					password manager such as Bitwarden or Proton Pass. Codes are encrypted and stored only on this device.
 				</div>
 			</form>
-		</div>
 	);
 }

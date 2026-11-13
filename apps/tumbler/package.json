@@ -6,13 +6,15 @@
 		"dev": "cf dev",
 		"build": "cf build",
 		"deploy": "cf deploy",
-		"db:migrate:local": "cf d1 migrations apply tumbler-db --local",
+		"db:migrate:local": "bun run scripts/migrate-local.ts",
+		"test:api": "bun run scripts/api-smoke.ts",
 		"icons": "bun run scripts/build-icons.ts",
 		"typecheck": "cf workers types && tsc -p tsconfig.worker.json && tsc -p tsconfig.web.json"
 	},
 	"dependencies": {
 		"@cfsa/crypto": "workspace:*",
 		"@cfsa/importers": "workspace:*",
+		"@cfsa/server-kit": "workspace:*",
 		"@cfsa/totp": "workspace:*",
 		"hono": "^4.13.18",
 		"jsqr": "^1.4.0",

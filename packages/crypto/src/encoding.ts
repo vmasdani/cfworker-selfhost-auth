@@ -27,3 +27,16 @@ export function timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean {
 	for (let i = 0; i < a.length; i++) diff |= a[i]! ^ b[i]!;
 	return diff === 0;
 }
+
+export function toB64Url(bytes: Uint8Array): string {
+	return toB64(bytes).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+export function fromB64Url(s: string): Uint8Array {
+	const b64 = s.replace(/-/g, "+").replace(/_/g, "/");
+	return fromB64(b64 + "=".repeat((4 - (b64.length % 4)) % 4));
+}
+
+export async function sha256(data: Uint8Array): Promise<Uint8Array> {
+	return new Uint8Array(await crypto.subtle.digest("SHA-256", data as BufferSource));
+}
