@@ -1,4 +1,8 @@
 {
 	"extends": "../../tsconfig.base.json",
-	"include": ["src"]
+	"compilerOptions": {
+		"lib": ["es2024", "dom"],
+		"types": ["bun"]
+	},
+	"include": ["src", "test"]
 }

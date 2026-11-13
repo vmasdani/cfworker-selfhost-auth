@@ -1,0 +1,70 @@
+import { useState } from "preact/hooks";
+import { PinError, unlockWithPassword, unlockWithPin } from "../lib/vault.ts";
+import { Brand } from "./ui.tsx";
+
+interface Props {
+	hasPin: boolean;
+	onUnlocked: () => void;
+	onPinStateChange: () => Promise<unknown>;
+}
+
+export function Unlock({ hasPin, onUnlocked, onPinStateChange }: Props) {
+	const [mode, setMode] = useState<"pin" | "password">(hasPin ? "pin" : "password");
+	const [value, setValue] = useState("");
+	const [error, setError] = useState<string | null>(null);
+	const [busy, setBusy] = useState(false);
+	const pinMode = mode === "pin" && hasPin;
+
+	async function submit(e: Event) {
+		e.preventDefault();
+		if (!value) return;
+		setBusy(true);
+		setError(null);
+		try {
+			if (pinMode) await unlockWithPin(value);
+			else await unlockWithPassword(value);
+			setValue("");
+			onUnlocked();
+		} catch (err) {
+			setValue("");
+			setError(err instanceof Error ? err.message : String(err));
+			if (err instanceof PinError) {
+				await onPinStateChange();
+				if (err.remaining === 0) setMode("password");
+			}
+		} finally {
+			setBusy(false);
+		}
+	}
+
+	return (
+		<div class="centered">
+			<form class="card" onSubmit={submit}>
+				<Brand subtitle="Vault locked" />
+				<input type="text" name="username" autocomplete="username" value="Tumbler local vault" hidden readOnly />
+				{pinMode ? (
+					<>
+						<label for="unlock">PIN</label>
+						<input id="unlock" key="pin" type="password" inputMode="numeric" autocomplete="off" value={value}
+							onInput={(e) => setValue(e.currentTarget.value.replace(/\D/g, ""))} autofocus />
+					</>
+				) : (
+					<>
+						<label for="unlock">Master password</label>
+						<input id="unlock" key="pw" type="password" autocomplete="current-password" value={value}
+							onInput={(e) => setValue(e.currentTarget.value)} autofocus />
+					</>
+				)}
+				{error && <p class="error">{error}</p>}
+				<button class="primary block" type="submit" disabled={busy || !value}>
+					{busy ? "Unlocking…" : "Unlock"}
+				</button>
+				{hasPin && (
+					<button type="button" class="link" onClick={() => { setMode(pinMode ? "password" : "pin"); setValue(""); setError(null); }}>
+						{pinMode ? "Use master password instead" : "Use PIN instead"}
+					</button>
+				)}
+			</form>
+		</div>
+	);
+}

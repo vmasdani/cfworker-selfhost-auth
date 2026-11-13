@@ -2,8 +2,10 @@
 	"extends": "../../tsconfig.base.json",
 	"compilerOptions": {
 		"lib": ["es2024", "dom", "dom.iterable"],
+		"types": ["vite/client"],
 		"jsx": "react-jsx",
 		"jsxImportSource": "preact"
 	},
-	"include": ["web"]
+	"include": ["web"],
+	"exclude": ["web/**/__tests__"]
 }

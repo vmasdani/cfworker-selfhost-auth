@@ -4,7 +4,7 @@ Self-hosted authentication and secrets tools that run on Cloudflare Workers + D1
 
 | App | Status | Description |
 |---|---|---|
-| [Tumbler Authenticator](apps/tumbler) | scaffold | Offline-capable PWA TOTP authenticator with optional end-to-end encrypted sync |
+| [Tumbler Authenticator](apps/tumbler) | local vault working, sync pending | Offline-capable PWA TOTP authenticator with optional end-to-end encrypted sync |
 | Secrets manager | planned | Infisical-like secrets management on Workers |
 
 ## Principles
@@ -56,6 +56,7 @@ bun install
 bun run dev:tumbler     # local dev server (cf dev)
 bun run typecheck
 bun test
+bun run --cwd apps/tumbler icons   # regenerate logo + PWA icons into apps/tumbler/public
 ```
 
 Repository layout:
