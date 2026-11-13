@@ -31,8 +31,7 @@ export type FirstAdmin =
 	/**
 	 * Installer registers the first account through the app's Bitwarden-compatible
 	 * `POST /api/accounts/register` right after deploy, using client-side Bitwarden key
-	 * derivation, an admin login the user chooses (username or own email), and a generated
-	 * master password shown once. The first registered
+	 * derivation, with an admin login and master password the user chooses. The first registered
 	 * user becomes admin, so this closes the window in which anyone else could claim it.
 	 */
 	| { kind: "bitwarden-register"; endpoint: string };

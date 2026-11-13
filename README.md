@@ -58,7 +58,7 @@ Available now: claim the NodeWarden admin account right after deploying it. Node
 ./install.sh nodewarden-claim --url https://nodewarden.<you>.workers.dev
 ```
 
-It asks for the admin login (a username such as `admin`, which becomes `admin@<worker host>`, or your own email such as `you@proton.me`) and a display name, generates the master password, registers the account, verifies it by logging in, and prints the credentials once. It refuses if the instance already has an account.
+It asks for the admin login (a username such as `admin`, which becomes `admin@<worker host>`, or your own email such as `you@proton.me`) a display name, and a master password you choose (typed hidden, twice; 12+ characters, a memorable passphrase works well). It derives the keys locally, registers the account, verifies it by logging in, and never prints or stores the password. It refuses if the instance already has an account.
 
 ## Development
 

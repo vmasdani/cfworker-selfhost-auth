@@ -6,7 +6,7 @@
 // by logging in and decrypting the returned user key.
 
 import { decryptEncString, makeRegistration, normalizeEmail } from "./lib/bitwarden.ts";
-import { generatePassword } from "./lib/password.ts";
+import { validateMasterPassword } from "./lib/password.ts";
 
 export class ClaimError extends Error {
 	override name = "ClaimError";
@@ -21,7 +21,6 @@ interface Bootstrap {
 export interface ClaimResult {
 	url: string;
 	email: string;
-	password: string;
 }
 
 function originOf(url: string): string {
@@ -80,7 +79,19 @@ export function loginFromUsername(username: string, url: string): string {
 	return `${u}@${host.includes(".") && !/^[\d.]+$/.test(host) ? host : "nodewarden.local"}`;
 }
 
-export async function claimFirstAdmin(args: { url: string; email: string; name?: string }): Promise<ClaimResult> {
+/** Fail early, before asking for credentials, when the instance cannot be claimed. */
+export async function assertClaimable(url: string): Promise<void> {
+	const boot = await getBootstrap(originOf(url));
+	if (boot.jwtUnsafeReason) throw new ClaimError(`NodeWarden JWT_SECRET is ${boot.jwtUnsafeReason}; set it before claiming`);
+	if (boot.registrationInviteRequired) throw new ClaimError(ALREADY_CLAIMED);
+}
+
+export async function claimFirstAdmin(args: {
+	url: string;
+	email: string;
+	password: string;
+	name?: string;
+}): Promise<ClaimResult> {
 	const origin = originOf(args.url);
 	const email = normalizeEmail(args.email);
 	if (!/^[^@\s]+@[^@\s]+$/.test(email)) throw new ClaimError("Invalid email address");
@@ -89,8 +100,14 @@ export async function claimFirstAdmin(args: { url: string; email: string; name?:
 	if (boot.jwtUnsafeReason) throw new ClaimError(`NodeWarden JWT_SECRET is ${boot.jwtUnsafeReason}; set it before claiming`);
 	if (boot.registrationInviteRequired) throw new ClaimError(ALREADY_CLAIMED);
 
-	const password = generatePassword();
-	const reg = await makeRegistration({ email, name: args.name ?? email, password, iterations: boot.defaultKdfIterations });
+	const pwError = validateMasterPassword(args.password, email);
+	if (pwError) throw new ClaimError(pwError);
+	const reg = await makeRegistration({
+		email,
+		name: args.name ?? email,
+		password: args.password,
+		iterations: boot.defaultKdfIterations,
+	});
 
 	const res = await request(`${origin}/api/accounts/register`, {
 		method: "POST",
@@ -106,7 +123,7 @@ export async function claimFirstAdmin(args: { url: string; email: string; name?:
 
 	await verifyLogin(origin, email, reg.masterKeys.masterPasswordHash, reg.masterKeys.stretched, reg.userKey);
 	reg.userKey.fill(0);
-	return { url: origin, email, password };
+	return { url: origin, email };
 }
 
 /** Log in with the new credentials and check the server returns our encrypted user key intact. */
@@ -142,8 +159,8 @@ async function verifyLogin(
 	}
 }
 
-/** The only place credentials are printed. */
-export function printCredentialsOnce(r: ClaimResult): void {
+/** Summary after a successful claim. The master password is never echoed back. */
+export function printClaimSummary(r: ClaimResult): void {
 	const line = "─".repeat(64);
 	console.log(`
 ${line}
@@ -151,12 +168,12 @@ ${line}
 
   URL              ${r.url}
   Login (email)    ${r.email}
-  Master password  ${r.password}
+  Master password  (the one you entered; not shown or stored)
 
-  ⚠  This password is shown ONCE and is not stored anywhere.
-     It cannot be recovered: losing it loses the vault.
-     Do not store it only inside this NodeWarden vault. Keep it in a
-     separate password manager (e.g. Proton Pass) or written down offline.
+  ⚠  The master password cannot be recovered or reset: losing it
+     loses the vault. Do not keep it only inside this NodeWarden vault.
+     Keep a copy in a separate password manager (e.g. Proton Pass)
+     or written down offline.
 
   Next: sign in, then enable two-step login (TOTP) under Settings
   and keep the TOTP in Tumbler. Invite other users with invite codes.

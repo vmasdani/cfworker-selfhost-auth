@@ -7,7 +7,7 @@ import {
 	splitKey,
 	unb64,
 } from "../src/lib/bitwarden.ts";
-import { generatePassword } from "../src/lib/password.ts";
+import { validateMasterPassword } from "../src/lib/password.ts";
 import { loginFromUsername } from "../src/nodewarden.ts";
 
 const hex = (s: string) => new Uint8Array(Buffer.from(s, "hex"));
@@ -52,10 +52,12 @@ describe("registration", () => {
 	});
 });
 
-test("generated password shape", () => {
-	const pw = generatePassword();
-	expect(pw).toMatch(/^[A-HJ-NP-Za-km-z2-9]{6}(-[A-HJ-NP-Za-km-z2-9]{6}){4}$/);
-	expect(generatePassword()).not.toBe(pw);
+test("master password validation", () => {
+	expect(validateMasterPassword("short", "a@b.c")).not.toBeNull();
+	expect(validateMasterPassword("aaaaaaaaaaaaaa", "a@b.c")).not.toBeNull();
+	expect(validateMasterPassword(" padded passphrase ", "a@b.c")).not.toBeNull();
+	expect(validateMasterPassword("vmasdani rocks hard", "vmasdani@proton.me")).not.toBeNull();
+	expect(validateMasterPassword("orbit tulip cactus marble", "vmasdani@proton.me")).toBeNull();
 });
 
 describe("loginFromUsername", () => {

@@ -16,11 +16,16 @@
 //
 // Implemented commands:
 //   nodewarden-claim --url <worker url> [--username <name or email>] [--name <display name>] [--yes]
-//   Missing values are prompted for interactively.
+//   Missing values are prompted for interactively. The master password is always typed by the
+//   user (hidden, twice); on non-TTY stdin it is read as a line, e.g. for CI.
 
 import { parseArgs } from "node:util";
+
+const info = (msg: string) => process.stderr.write(`${msg}\n`);
 import { APPS } from "./apps.ts";
-import { ClaimError, claimFirstAdmin, loginFromUsername, printCredentialsOnce } from "./nodewarden.ts";
+import { MIN_MASTER_PASSWORD_LENGTH, validateMasterPassword } from "./lib/password.ts";
+import { CancelledError, readHidden } from "./lib/tty.ts";
+import { assertClaimable, ClaimError, claimFirstAdmin, loginFromUsername, printClaimSummary } from "./nodewarden.ts";
 
 const USAGE = `Usage:
   ./install.sh nodewarden-claim [--url <worker url>] [--username <name or email>] [--name <display name>] [--yes]
@@ -45,6 +50,7 @@ async function main(argv: string[]): Promise<number> {
 				console.error(USAGE);
 				return 2;
 			}
+			await assertClaimable(url);
 			const username =
 				values.username ?? prompt("Admin login: a username (e.g. admin) or your own email (e.g. you@proton.me):", "admin")?.trim();
 			if (!username) {
@@ -53,15 +59,16 @@ async function main(argv: string[]): Promise<number> {
 			}
 			const email = loginFromUsername(username, url);
 			const name = values.name ?? prompt("Display name:", username.split("@")[0])?.trim();
-			console.error(`\nAdmin login will be: ${email}`);
-			console.error("Bitwarden clients sign in with an email-shaped login; no mail is sent to it.");
+			info(`\nAdmin login will be: ${email}`);
+			info("Bitwarden clients sign in with an email-shaped login; no mail is sent to it.");
+			const password = await readNewPassword(email);
 			if (!values.yes && prompt("Create the admin account now? [y/N]")?.trim().toLowerCase() !== "y") {
-				console.error("Aborted. Nothing was created.");
+				info("Aborted. Nothing was created.");
 				return 1;
 			}
-			console.error("Deriving keys and registering the admin account…");
-			const result = await claimFirstAdmin({ url, email, name: name || undefined });
-			printCredentialsOnce(result);
+			info("Deriving keys and registering the admin account…");
+			const result = await claimFirstAdmin({ url, email, password, name: name || undefined });
+			printClaimSummary(result);
 			return 0;
 		}
 		default:
@@ -70,10 +77,31 @@ async function main(argv: string[]): Promise<number> {
 	}
 }
 
+async function readNewPassword(login: string): Promise<string> {
+	info(
+		`\nChoose the master password (${MIN_MASTER_PASSWORD_LENGTH}+ characters). A memorable passphrase works well,` +
+			"\ne.g. four or more unrelated words. It cannot be recovered if forgotten.",
+	);
+	for (let attempt = 0; attempt < 3; attempt++) {
+		const pw = await readHidden("Master password:");
+		const err = validateMasterPassword(pw, login);
+		if (err) {
+			info(`  ${err}`);
+			continue;
+		}
+		if ((await readHidden("Confirm master password:")) !== pw) {
+			info("  Passwords do not match.");
+			continue;
+		}
+		return pw;
+	}
+	throw new ClaimError("No valid master password entered. Nothing was created.");
+}
+
 try {
 	process.exit(await main(process.argv.slice(2)));
 } catch (e) {
-	if (e instanceof ClaimError) {
+	if (e instanceof ClaimError || e instanceof CancelledError) {
 		console.error(`\n✖ ${e.message}`);
 		process.exit(1);
 	}

@@ -1,23 +1,15 @@
-const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789"; // no 0/O, 1/l/I
+export const MIN_MASTER_PASSWORD_LENGTH = 12;
 
-/** Uniform random index in [0, n) via rejection sampling. */
-function randomIndex(n: number): number {
-	const limit = 256 - (256 % n);
-	const buf = new Uint8Array(1);
-	for (;;) {
-		crypto.getRandomValues(buf);
-		if (buf[0]! < limit) return buf[0]! % n;
+/** Returns an error message, or null when the master password is acceptable. */
+export function validateMasterPassword(password: string, login: string): string | null {
+	if (password.length < MIN_MASTER_PASSWORD_LENGTH) {
+		return `Use at least ${MIN_MASTER_PASSWORD_LENGTH} characters. A passphrase of 4+ words is easy to remember and strong.`;
 	}
-}
-
-/**
- * Generated master password: `groups` groups of `size` unambiguous characters joined by "-".
- * Default 5x6 = 30 characters, about 175 bits of entropy.
- */
-export function generatePassword(groups = 5, size = 6): string {
-	return Array.from({ length: groups }, () =>
-		Array.from({ length: size }, () => ALPHABET[randomIndex(ALPHABET.length)]).join(""),
-	).join("-");
+	if (/^(.)\1+$/u.test(password)) return "Password is a single repeated character.";
+	if (password.trim() !== password) return "Password starts or ends with a space; that is easy to get wrong when typing.";
+	const local = login.split("@")[0]!.toLowerCase();
+	if (local.length >= 3 && password.toLowerCase().includes(local)) return "Password must not contain your login name.";
+	return null;
 }
 
 export function generateSecret(bytes = 32): string {
