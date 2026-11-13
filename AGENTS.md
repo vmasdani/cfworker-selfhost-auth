@@ -11,6 +11,7 @@ Rules for AI agents and contributors working in this repository.
 ## Provisioning and deployment
 - **The installer is the source of truth.** Provision, migrate and deploy through `./install.sh` (non-interactive: `--yes --account <id> --apps <list>`). Do not improvise resource creation with ad-hoc `cf` commands.
 - **Never delete Cloudflare resources** (D1 databases, R2 buckets, Workers, secrets) unless the user explicitly asks for that specific resource in the current conversation. In non-interactive sessions, `cf` destructive commands without `--force` print `Aborted.` and still exit 0; do not treat exit 0 as success.
+- **Third-party apps** (e.g. NodeWarden) are registered in `installer/src/apps.ts`, never vendored. Pin a full commit SHA with the tag; bump it only after reviewing the upstream diff. They deploy with their own config (NodeWarden ships `wrangler.toml`, so it uses Wrangler via `npx`, in its own clone directory).
 - **Migrations are append-only.** Never edit an applied migration in `apps/*/migrations/`; add a new numbered file.
 - Ask before `cf deploy` to a production account.
 

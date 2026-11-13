@@ -12,3 +12,6 @@ dist/
 # Never commit authenticator backups or exports (they contain plaintext TOTP secrets)
 *authenticator_backup*.json
 *.tumbler-backup.json
+
+# Installer working directory (cloned third-party apps)
+.installer/
