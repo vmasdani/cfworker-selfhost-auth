@@ -117,7 +117,11 @@ export interface DnsRecord {
 	name: string;
 	type: string;
 	content?: string;
+	/** Set on records Cloudflare manages for a Worker custom domain. */
+	meta?: { read_only?: boolean; origin_worker_id?: string };
 }
+
+export const isWorkerManaged = (r: DnsRecord) => !!(r.meta?.read_only && r.meta.origin_worker_id);
 
 export async function dnsRecordsNamed(ctx: CfContext, zone: string, hostname: string): Promise<DnsRecord[]> {
 	const all = await cf<DnsRecord[]>(ctx, ["dns", "records", "list", "--zone", zone, "--name", hostname]);

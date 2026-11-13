@@ -20,6 +20,7 @@ import {
 	CfError,
 	createD1,
 	dnsRecordsNamed,
+	isWorkerManaged,
 	findD1,
 	workerSecretNames,
 	zoneFor,
@@ -59,16 +60,22 @@ export async function installTumbler(o: TumblerInstallOptions): Promise<TumblerI
 	const { ctx, log } = o;
 	const env: Record<string, string> = {};
 
+	const existingSecrets = await workerSecretNames(ctx, WORKER);
+	const firstInstall = existingSecrets === null;
+
 	// 2. domain
 	if (o.domain) {
 		const zone = await zoneFor(ctx, o.domain);
 		if (!zone) throw new ClaimError(`No zone for ${o.domain} in this account. Add the domain to Cloudflare first, or install without a custom domain.`);
 		if (zone.status !== "active") throw new ClaimError(`Zone ${zone.name} is ${zone.status}, not active`);
-		const existing = await dnsRecordsNamed(ctx, zone.name, o.domain);
-		// A Worker custom domain shows up as a read-only record; anything else is a conflict.
-		const conflict = existing.filter((r) => !/worker/i.test(`${r.type} ${r.content ?? ""}`));
-		if (conflict.length) {
-			throw new ClaimError(`${o.domain} already has DNS records (${conflict.map((r) => r.type).join(", ")}). Pick another hostname or remove them yourself.`);
+		const records = await dnsRecordsNamed(ctx, zone.name, o.domain);
+		const foreign = records.filter((r) => !isWorkerManaged(r));
+		if (foreign.length) {
+			throw new ClaimError(`${o.domain} already has DNS records (${foreign.map((r) => r.type).join(", ")}). Pick another hostname or remove them yourself.`);
+		}
+		// A Worker-managed record is ours on upgrade; on a first install it belongs to some other Worker.
+		if (records.length && firstInstall) {
+			throw new ClaimError(`${o.domain} is already the custom domain of another Worker. Pick another hostname.`);
 		}
 		log(`✓ domain ${o.domain} (zone ${zone.name})`);
 		env.TUMBLER_DOMAIN = o.domain;
@@ -95,10 +102,8 @@ export async function installTumbler(o: TumblerInstallOptions): Promise<TumblerI
 	} else log("• would apply migrations");
 
 	// 5. secrets
-	const existing = await workerSecretNames(ctx, WORKER);
-	const firstInstall = existing === null;
 	const secrets: Record<string, string> = {};
-	if (!existing?.includes("SERVER_SECRET")) secrets.SERVER_SECRET = generateSecret(32);
+	if (!existingSecrets?.includes("SERVER_SECRET")) secrets.SERVER_SECRET = generateSecret(32);
 	secrets.ADMIN_SETUP_TOKEN = generateSecret(32);
 	log(`✓ secrets to set: ${Object.keys(secrets).join(", ")} (values never printed)${secrets.SERVER_SECRET ? "" : "; existing SERVER_SECRET kept"}`);
 
@@ -130,10 +135,34 @@ function findWorkersDevUrl(out: string): string | null {
 	return /https:\/\/[a-z0-9.-]+\.workers\.dev/i.exec(out)?.[0] ?? null;
 }
 
+/** What public DNS (Cloudflare DoH) says, to spot a local resolver with stale or hijacked answers. */
+async function publicA(host: string): Promise<string[]> {
+	try {
+		const res = await fetch(`https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(host)}&type=A`, {
+			headers: { Accept: "application/dns-json" },
+			signal: AbortSignal.timeout(8000),
+		});
+		const j = (await res.json()) as { Answer?: { type: number; data: string }[] };
+		return (j.Answer ?? []).filter((a) => a.type === 1).map((a) => a.data);
+	} catch {
+		return [];
+	}
+}
+
+async function localA(host: string): Promise<string[]> {
+	try {
+		return (await Bun.dns.lookup(host, { family: 4 })).map((r) => r.address);
+	} catch {
+		return [];
+	}
+}
+
 /** New custom domains need DNS + a certificate; that can take a few minutes. */
 async function waitHealthy(url: string, log: (m: string) => void): Promise<void> {
 	const deadline = Date.now() + 10 * 60_000;
+	const host = new URL(url).hostname;
 	let announced = false;
+	let dnsChecked = false;
 	while (Date.now() < deadline) {
 		try {
 			const res = await fetch(`${url}/api/health`, { signal: AbortSignal.timeout(10_000) });
@@ -147,6 +176,16 @@ async function waitHealthy(url: string, log: (m: string) => void): Promise<void>
 		if (!announced) {
 			log("• waiting for the domain and certificate (can take a few minutes)…");
 			announced = true;
+		} else if (!dnsChecked) {
+			dnsChecked = true;
+			const [pub, loc] = await Promise.all([publicA(host), localA(host)]);
+			if (pub.length && loc.length && !loc.some((ip) => pub.includes(ip))) {
+				log(
+					`⚠ This machine's DNS resolves ${host} to ${loc.join(", ")}, but public DNS says ${pub.join(", ")}.\n` +
+						"  Your local resolver has a stale or wrong answer; the site itself may be fine. Point this machine at public DNS\n" +
+						"  (e.g. `sudo resolvectl dns <interface> 1.1.1.1 1.0.0.1 && sudo resolvectl flush-caches`); I keep waiting.",
+				);
+			}
 		}
 		await Bun.sleep(5000);
 	}
