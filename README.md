@@ -50,7 +50,15 @@ See [docs/threat-model.md](docs/threat-model.md).
 ./install.sh
 ```
 
-Requires [Bun](https://bun.sh), Node.js 22.18+ and the [`cf` CLI](https://developers.cloudflare.com/cf/) (`npm install --global cf`). The installer selects the Cloudflare account and apps, reuses or creates D1 databases, applies migrations, deploys, and creates the first admin. It is not implemented yet.
+Requires [Bun](https://bun.sh), Node.js 22.18+ and the [`cf` CLI](https://developers.cloudflare.com/cf/) (`npm install --global cf`). The installer selects the Cloudflare account and apps, reuses or creates D1 databases, applies migrations, deploys, and creates the first admin. The full flow is not implemented yet.
+
+Available now: claim the NodeWarden admin account right after deploying it. NodeWarden makes the first registered account the admin, so do this immediately:
+
+```sh
+./install.sh nodewarden-claim --url https://nodewarden.<you>.workers.dev
+```
+
+It asks for the admin login (a username such as `admin`, which becomes `admin@<worker host>`, or your own email such as `you@proton.me`) and a display name, generates the master password, registers the account, verifies it by logging in, and prints the credentials once. It refuses if the instance already has an account.
 
 ## Development
 
