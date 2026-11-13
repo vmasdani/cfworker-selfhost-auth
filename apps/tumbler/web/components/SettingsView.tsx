@@ -3,7 +3,7 @@ import { MIN_PIN_LENGTH, validatePassword, validatePin } from "../lib/vault-core
 import { changePassword } from "../lib/account.ts";
 import { removePin, setPin, type Settings } from "../lib/vault.ts";
 import { AccountSection } from "./AccountSection.tsx";
-import { TopBar } from "./ui.tsx";
+import { PinInput, TopBar } from "./ui.tsx";
 
 interface Props {
 	settings: Settings;
@@ -115,11 +115,9 @@ function PinSection({ hasPin, onChanged }: { hasPin: boolean; onChanged: () => P
 			{editing ? (
 				<form onSubmit={save}>
 					<label for="newpin">New PIN</label>
-					<input id="newpin" type="password" inputMode="numeric" autocomplete="off" value={pin}
-						onInput={(e) => setPinValue(e.currentTarget.value.replace(/\D/g, ""))} autofocus />
+					<PinInput id="newpin" value={pin} onValue={setPinValue} autofocus />
 					<label for="newpin2">Confirm PIN</label>
-					<input id="newpin2" type="password" inputMode="numeric" autocomplete="off" value={confirm}
-						onInput={(e) => setConfirm(e.currentTarget.value.replace(/\D/g, ""))} />
+					<PinInput id="newpin2" value={confirm} onValue={setConfirm} />
 					<div class="actions">
 						<button type="button" onClick={() => setEditing(false)}>Cancel</button>
 						<button class="primary" type="submit" disabled={busy}>{busy ? "Saving…" : "Save PIN"}</button>

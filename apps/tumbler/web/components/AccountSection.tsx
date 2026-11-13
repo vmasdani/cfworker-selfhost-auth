@@ -175,7 +175,7 @@ function TotpSection({ account }: { account: AccountInfo }) {
 					<QrCode value={setup.uri} label="Two-step login setup code" />
 					<p class="hint mono break">{setup.secret.match(/.{1,4}/g)!.join(" ")}</p>
 					<label for="te-code">Code from the authenticator</label>
-					<input id="te-code" inputMode="numeric" autocomplete="one-time-code" maxLength={6} value={code}
+					<input id="te-code" inputMode="numeric" pattern="[0-9]*" autocomplete="one-time-code" maxLength={6} value={code}
 						onInput={(e) => setCode(e.currentTarget.value.replace(/\D/g, ""))} />
 					<div class="actions">
 						<button type="button" onClick={() => setSetup(null)}>Cancel</button>

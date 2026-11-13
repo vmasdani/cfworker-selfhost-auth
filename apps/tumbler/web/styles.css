@@ -190,3 +190,6 @@ label.button.block { display: flex; width: 100%; margin-top: 16px; }
 .align-end { align-items: flex-end; }
 .invite-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 14px; }
 .badge { margin-left: 8px; }
+
+/* Masked digits for PIN fields (see PinInput). */
+.pin-input { -webkit-text-security: disc; letter-spacing: 0.2em; }

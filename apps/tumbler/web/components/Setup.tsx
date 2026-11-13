@@ -2,7 +2,7 @@ import { useState } from "preact/hooks";
 import { createVault } from "../lib/vault.ts";
 import { MIN_PASSWORD_LENGTH, MIN_PIN_LENGTH, validatePassword, validatePin } from "../lib/vault-core.ts";
 import { JoinForm, RecoverForm, RecoveryKeyView, SignInForm } from "./AccountForms.tsx";
-import { Brand } from "./ui.tsx";
+import { Brand, PinInput } from "./ui.tsx";
 
 type Mode = "create" | "signin" | "join" | "recover";
 
@@ -92,11 +92,9 @@ function CreateVault({ onDone }: { onDone: () => void }) {
 				{usePin && (
 					<>
 						<label for="pin">PIN ({MIN_PIN_LENGTH}+ digits)</label>
-						<input id="pin" type="password" inputMode="numeric" autocomplete="off" value={pin}
-							onInput={(e) => setPin(e.currentTarget.value.replace(/\D/g, ""))} />
+						<PinInput id="pin" value={pin} onValue={setPin} />
 						<label for="pin2">Confirm PIN</label>
-						<input id="pin2" type="password" inputMode="numeric" autocomplete="off" value={pinConfirm}
-							onInput={(e) => setPinConfirm(e.currentTarget.value.replace(/\D/g, ""))} />
+						<PinInput id="pin2" value={pinConfirm} onValue={setPinConfirm} />
 					</>
 				)}
 

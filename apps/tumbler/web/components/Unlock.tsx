@@ -2,7 +2,7 @@ import { useEffect, useState } from "preact/hooks";
 import { PinError, unlockWithPassword, unlockWithPin } from "../lib/vault.ts";
 import { getAccount } from "../lib/account.ts";
 import { RecoverForm } from "./AccountForms.tsx";
-import { Brand } from "./ui.tsx";
+import { Brand, PinInput } from "./ui.tsx";
 
 interface Props {
 	hasPin: boolean;
@@ -64,8 +64,7 @@ export function Unlock({ hasPin, onUnlocked, onPinStateChange }: Props) {
 				{pinMode ? (
 					<>
 						<label for="unlock">PIN</label>
-						<input id="unlock" key="pin" type="password" inputMode="numeric" autocomplete="off" value={value}
-							onInput={(e) => setValue(e.currentTarget.value.replace(/\D/g, ""))} autofocus />
+						<PinInput key="pin" id="unlock" value={value} onValue={setValue} autofocus />
 					</>
 				) : (
 					<>

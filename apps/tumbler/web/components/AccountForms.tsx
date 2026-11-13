@@ -50,7 +50,7 @@ export function SignInForm({ username: initialUser = "", onDone, note }: { usern
 			{needTotp && (
 				<>
 					<label for="si-totp">Two-step login code</label>
-					<input id="si-totp" inputMode="numeric" autocomplete="one-time-code" maxLength={6} value={totp} autofocus
+					<input id="si-totp" inputMode="numeric" pattern="[0-9]*" autocomplete="one-time-code" maxLength={6} value={totp} autofocus
 						onInput={(e) => setTotp(e.currentTarget.value.replace(/\D/g, ""))} />
 				</>
 			)}

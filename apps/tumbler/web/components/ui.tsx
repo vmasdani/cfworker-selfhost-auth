@@ -75,3 +75,26 @@ export function Timer({ remainingMs, periodMs }: { remainingMs: number; periodMs
 		</svg>
 	);
 }
+
+/**
+ * Digits-only secret input that opens the numeric keypad on phones.
+ * type="password" makes mobile browsers ignore inputMode, so use type="text" masked with
+ * -webkit-text-security; where that CSS is unsupported, fall back to type="password".
+ */
+const CAN_MASK = typeof CSS !== "undefined" && typeof CSS.supports === "function" && CSS.supports("-webkit-text-security", "disc");
+
+export function PinInput({ id, value, onValue, autofocus }: {
+	id: string;
+	value: string;
+	onValue: (digits: string) => void;
+	autofocus?: boolean;
+}) {
+	const onInput = (e: { currentTarget: HTMLInputElement }) => onValue(e.currentTarget.value.replace(/\D/g, ""));
+	return CAN_MASK ? (
+		<input id={id} type="text" class="pin-input" inputMode="numeric" pattern="[0-9]*" autocomplete="off"
+			autocapitalize="off" spellcheck={false} maxLength={64} value={value} autofocus={autofocus} onInput={onInput} />
+	) : (
+		<input id={id} type="password" inputMode="numeric" pattern="[0-9]*" autocomplete="off"
+			maxLength={64} value={value} autofocus={autofocus} onInput={onInput} />
+	);
+}
