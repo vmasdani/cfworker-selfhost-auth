@@ -130,6 +130,8 @@ function TotpSection({ account }: { account: AccountInfo }) {
 	const [disabling, setDisabling] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [busy, setBusy] = useState(false);
+	const [ack, setAck] = useState(false);
+	const [copied, setCopied] = useState<"key" | "uri" | null>(null);
 
 	const run = async (fn: () => Promise<void>) => {
 		setBusy(true);
@@ -146,7 +148,11 @@ function TotpSection({ account }: { account: AccountInfo }) {
 	if (account.totpEnabled) {
 		return (
 			<div class="settings-group">
-				<p class="hint">On. Signing in to this account on a new device needs a code from your authenticator.</p>
+				<p>On <span class="badge">✓</span></p>
+				<p class="hint">
+					Signing in on a new device needs a code from your authenticator. If you lose it, use your recovery key:
+					it sets a new password and turns two-step login off.
+				</p>
 				{disabling ? (
 					<form onSubmit={(e) => { e.preventDefault(); void run(async () => { await totpDisable(password); setDisabling(false); setPassword(""); }); }}>
 						<label for="td-pw">Password</label>
@@ -164,28 +170,77 @@ function TotpSection({ account }: { account: AccountInfo }) {
 		);
 	}
 
+	if (!setup) {
+		return (
+			<div class="settings-group">
+				<p>Off <span class="badge">recommended</span></p>
+				<p class="hint">Require a 6-digit code, in addition to your password, when this account signs in on a new device.</p>
+				<TotpWarning />
+				<div class="actions">
+					<button class="primary" disabled={busy} onClick={() => void run(async () => { setSetup(await totpSetup()); setAck(false); setCode(""); })}>
+						Set up two-step login
+					</button>
+				</div>
+				{error && <p class="error">{error}</p>}
+			</div>
+		);
+	}
+
+	const groupedKey = setup.secret.match(/.{1,4}/g)!.join(" ");
 	return (
-		<div class="settings-group">
+		<form class="settings-group" onSubmit={(e) => { e.preventDefault(); void run(async () => { await totpEnable(code); setSetup(null); setCode(""); }); }}>
+			<h3>1. Add it to a second authenticator</h3>
 			<p class="hint">
-				Off. Turn on to require a 6-digit code when signing in on a new device. Keep the code in a
-				<strong> different</strong> authenticator, or you could lock yourself out. The recovery key also turns it off.
+				Scan with <strong>another phone</strong> or authenticator app, or put the setup key in your
+				<strong> password manager</strong> (Bitwarden and Proton Pass can generate these codes).
+				Not only in Tumbler on this device: you need the code to sign in to Tumbler.
 			</p>
-			{setup ? (
-				<form onSubmit={(e) => { e.preventDefault(); void run(async () => { await totpEnable(code); setSetup(null); setCode(""); }); }}>
-					<QrCode value={setup.uri} label="Two-step login setup code" />
-					<p class="hint mono break">{setup.secret.match(/.{1,4}/g)!.join(" ")}</p>
-					<label for="te-code">Code from the authenticator</label>
-					<input id="te-code" inputMode="numeric" pattern="[0-9]*" autocomplete="one-time-code" maxLength={6} value={code}
-						onInput={(e) => setCode(e.currentTarget.value.replace(/\D/g, ""))} />
-					<div class="actions">
-						<button type="button" onClick={() => setSetup(null)}>Cancel</button>
-						<button class="primary" type="submit" disabled={busy || code.length !== 6}>Turn on</button>
-					</div>
-				</form>
-			) : (
-				<div class="actions"><button disabled={busy} onClick={() => void run(async () => setSetup(await totpSetup()))}>Set up</button></div>
-			)}
+			<QrCode value={setup.uri} label="Two-step login setup code" />
+			<label>Setup key</label>
+			<p class="mono break setup-key" aria-label="Setup key">{groupedKey}</p>
+			<div class="actions">
+				<button type="button" onClick={async () => { await copySecret(setup.secret, 120); setCopied("key"); }}>
+					{copied === "key" ? "Key copied (clears in 2 min)" : "Copy setup key"}
+				</button>
+				<button type="button" onClick={async () => { await copySecret(setup.uri, 120); setCopied("uri"); }}>
+					{copied === "uri" ? "Link copied (clears in 2 min)" : "Copy otpauth:// link"}
+				</button>
+			</div>
+
+			<h3>2. Confirm with a code</h3>
+			<label for="te-code">Code from the authenticator</label>
+			<input id="te-code" inputMode="numeric" pattern="[0-9]*" autocomplete="one-time-code" maxLength={6} value={code}
+				onInput={(e) => setCode(e.currentTarget.value.replace(/\D/g, ""))} />
+
+			<div class="notice warn">
+				<strong>Lockout risk.</strong> With two-step login on, a lost or wiped authenticator means you cannot sign in
+				on a new device. Only your <strong>recovery key</strong> gets you back in (it also turns two-step login off).
+			</div>
+			<label class="check">
+				<input type="checkbox" checked={ack} onChange={(e) => setAck(e.currentTarget.checked)} />
+				I saved this code on a second device or in my password manager, and my recovery key is in my password
+				manager or written down.
+			</label>
+			<div class="actions">
+				<button type="button" onClick={() => setSetup(null)}>Cancel</button>
+				<button class="primary" type="submit" disabled={busy || code.length !== 6 || !ack}>Turn on</button>
+			</div>
 			{error && <p class="error">{error}</p>}
+		</form>
+	);
+}
+
+function TotpWarning() {
+	return (
+		<div class="notice warn">
+			<p><strong>More security, but a lockout risk.</strong> A stolen password alone will no longer be enough to sign in.
+				But if you lose the codes, you are locked out of new devices.</p>
+			<p>Before turning it on:</p>
+			<ul>
+				<li>Scan the code with a <strong>second phone</strong>, or save the setup key in your <strong>password manager</strong>.</li>
+				<li>Keep your <strong>recovery key</strong> in your password manager or written down offline. It is the way back in.</li>
+				<li>Do not keep this code only in Tumbler: you need it to sign in to Tumbler.</li>
+			</ul>
 		</div>
 	);
 }
