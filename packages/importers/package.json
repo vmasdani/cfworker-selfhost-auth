@@ -2,8 +2,13 @@
 	"name": "@cfsa/importers",
 	"private": true,
 	"type": "module",
-	"exports": { ".": "./src/index.ts" },
+	"exports": {
+		".": "./src/index.ts"
+	},
 	"scripts": {
 		"typecheck": "tsc -p ."
+	},
+	"dependencies": {
+		"@cfsa/totp": "workspace:*"
 	}
 }

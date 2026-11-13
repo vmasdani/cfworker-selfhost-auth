@@ -1,6 +1,7 @@
 // Stateful local vault: IndexedDB storage + in-memory unlocked session.
 
 import { DecryptError, importAesKey } from "@cfsa/crypto";
+import type { ImportedEntry } from "@cfsa/importers";
 import { compareEntries, openEntry, sealEntry, type Entry, type EntryRecord } from "./entries.ts";
 import { meta, records, requestPersistence } from "./idb.ts";
 import { clearOtpKeys } from "./otp-keys.ts";
@@ -169,4 +170,26 @@ export async function saveSettings(s: Settings): Promise<void> {
 
 export function newEntryId(): string {
 	return crypto.randomUUID();
+}
+
+/** Re-check the master password, e.g. before showing or exporting secrets. */
+export async function verifyMasterPassword(password: string): Promise<boolean> {
+	const h = await getHeader();
+	if (!h) return false;
+	try {
+		(await unwrapWithSecret(password, h.kdf, h.wrapped)).fill(0);
+		return true;
+	} catch (e) {
+		if (e instanceof DecryptError) return false;
+		throw e;
+	}
+}
+
+/** Add imported accounts as new entries. Returns how many were added. */
+export async function importEntries(items: ImportedEntry[]): Promise<number> {
+	const now = Date.now();
+	await saveEntries(
+		items.map((item, i) => ({ ...item, id: newEntryId(), note: item.note ?? "", createdAt: now + i, updatedAt: now + i })),
+	);
+	return items.length;
 }

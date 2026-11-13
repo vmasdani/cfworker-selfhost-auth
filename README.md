@@ -4,7 +4,7 @@ Self-hosted authentication and secrets tools that run on Cloudflare Workers + D1
 
 | App | Status | Description |
 |---|---|---|
-| [Tumbler Authenticator](apps/tumbler) | local vault working, sync pending | Offline-capable PWA TOTP authenticator with optional end-to-end encrypted sync |
+| [Tumbler Authenticator](apps/tumbler) | local vault, QR scan, import/export working; sync pending | Offline-capable PWA TOTP authenticator with optional end-to-end encrypted sync |
 | Secrets manager | planned | Infisical-like secrets management on Workers |
 | [NodeWarden](https://github.com/shuaiplus/NodeWarden) (third-party) | installer support planned | Bitwarden-compatible password manager server on Workers + D1. Installed from upstream at a pinned commit; LGPL-3.0; not affiliated with Bitwarden |
 

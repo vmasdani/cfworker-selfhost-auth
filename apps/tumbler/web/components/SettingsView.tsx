@@ -9,13 +9,15 @@ interface Props {
 	onSettings: (s: Settings) => Promise<void>;
 	onPinChanged: () => Promise<unknown>;
 	onLock: () => void;
+	onImport: () => void;
+	onExport: () => void;
 	onBack: () => void;
 }
 
 const AUTO_LOCK = [1, 2, 5, 15, 30, 60];
 const CLIPBOARD = [0, 15, 30, 60, 120];
 
-export function SettingsView({ settings, hasPin, onSettings, onPinChanged, onLock, onBack }: Props) {
+export function SettingsView({ settings, hasPin, onSettings, onPinChanged, onLock, onImport, onExport, onBack }: Props) {
 	return (
 		<div class="shell">
 			<TopBar title="Settings" onBack={onBack} />
@@ -35,6 +37,18 @@ export function SettingsView({ settings, hasPin, onSettings, onPinChanged, onLoc
 					{CLIPBOARD.map((s) => <option value={s}>{s === 0 ? "Never" : `After ${s} seconds`}</option>)}
 				</select>
 				<div class="actions"><button onClick={onLock}>Lock now</button></div>
+			</div>
+
+			<h2>Import &amp; export</h2>
+			<div class="settings-group">
+				<p class="hint">
+					Import from Proton Authenticator, Google Authenticator, otpauth:// lists or a Tumbler backup.
+					Export an encrypted backup, or to Proton or Google Authenticator.
+				</p>
+				<div class="actions">
+					<button onClick={onImport}>Import</button>
+					<button onClick={onExport}>Export</button>
+				</div>
 			</div>
 
 			<h2>PIN unlock</h2>

@@ -10,12 +10,15 @@ import {
 import { useState } from "preact/hooks";
 import type { Entry } from "../lib/entries.ts";
 import { deleteEntry, newEntryId, saveEntries } from "../lib/vault.ts";
+import { QrScanner } from "./QrScanner.tsx";
 import { TopBar } from "./ui.tsx";
 
 interface Props {
 	/** Present when editing. */
 	entry?: Entry;
 	onDone: () => void;
+	/** A Google Authenticator transfer QR was scanned: hand it to the import flow. */
+	onImportMigration?: (uri: string) => void;
 }
 
 type Draft = Omit<OtpParams, "digits" | "period" | "counter"> & { digits: string; period: string; counter: string; note: string };
@@ -25,15 +28,32 @@ function toDraft(p?: Partial<Entry>): Draft {
 	return { ...d, digits: String(d.digits), period: String(d.period), counter: String(d.counter) };
 }
 
-export function EntryForm({ entry, onDone }: Props) {
+export function EntryForm({ entry, onDone, onImportMigration }: Props) {
 	const editing = !!entry;
-	const [tab, setTab] = useState<"manual" | "uri">("manual");
+	const [tab, setTab] = useState<"scan" | "manual" | "uri">(entry ? "manual" : "scan");
 	const [draft, setDraft] = useState<Draft>(toDraft(entry));
 	const [uri, setUri] = useState("");
 	const [error, setError] = useState<string | null>(null);
 	const [busy, setBusy] = useState(false);
 
 	const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setDraft((d) => ({ ...d, [k]: v }));
+
+	function onScan(value: string): boolean {
+		if (/^otpauth-migration:/i.test(value)) {
+			onImportMigration?.(value);
+			return true;
+		}
+		try {
+			const p = parseOtpauthUri(value);
+			setDraft(toDraft({ ...p, note: draft.note }));
+			setError(null);
+			setTab("manual");
+			return true;
+		} catch (e) {
+			setError(e instanceof OtpauthError ? `QR code: ${e.message}` : "This QR code is not a 2FA setup code");
+			return false;
+		}
+	}
 
 	function applyUri() {
 		try {
@@ -97,19 +117,25 @@ export function EntryForm({ entry, onDone }: Props) {
 			<TopBar title={editing ? "Edit account" : "Add account"} onBack={onDone} />
 			{!editing && (
 				<div class="tabs" role="tablist">
+					<button type="button" class={tab === "scan" ? "active" : ""} onClick={() => setTab("scan")}>Scan QR</button>
 					<button type="button" class={tab === "manual" ? "active" : ""} onClick={() => setTab("manual")}>Enter key</button>
-					<button type="button" class={tab === "uri" ? "active" : ""} onClick={() => setTab("uri")}>Paste otpauth:// URI</button>
+					<button type="button" class={tab === "uri" ? "active" : ""} onClick={() => setTab("uri")}>Paste URI</button>
 				</div>
 			)}
 
-			{tab === "uri" && !editing ? (
+			{tab === "scan" && !editing ? (
+				<div>
+					<QrScanner onResult={onScan}
+						hint="Scan the 2FA setup QR code shown by the website, or a Google Authenticator transfer code." />
+					{error && <p class="error">{error}</p>}
+				</div>
+			) : tab === "uri" && !editing ? (
 				<div>
 					<label for="uri">otpauth:// URI</label>
 					<textarea id="uri" value={uri} placeholder="otpauth://totp/Issuer:account?secret=…" autocomplete="off"
 						spellcheck={false} onInput={(e) => setUri(e.currentTarget.value)} />
 					{error && <p class="error">{error}</p>}
 					<button class="primary block" type="button" onClick={applyUri} disabled={!uri.trim()}>Read URI</button>
-					<p class="hint">QR scanning and importing from Google Authenticator or Proton Authenticator are coming next.</p>
 				</div>
 			) : (
 				<form onSubmit={save}>

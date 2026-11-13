@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "preact/hooks";
 import { Codes } from "./components/Codes.tsx";
 import { EntryForm } from "./components/EntryForm.tsx";
+import { ExportView } from "./components/ExportView.tsx";
+import { ImportView } from "./components/ImportView.tsx";
 import { SettingsView } from "./components/SettingsView.tsx";
 import { Setup } from "./components/Setup.tsx";
 import { Unlock } from "./components/Unlock.tsx";
@@ -8,7 +10,13 @@ import type { Entry } from "./lib/entries.ts";
 import * as vault from "./lib/vault.ts";
 
 type Status = "loading" | "setup" | "locked" | "unlocked";
-type View = { name: "list" } | { name: "add" } | { name: "edit"; entry: Entry } | { name: "settings" };
+type View =
+	| { name: "list" }
+	| { name: "add" }
+	| { name: "edit"; entry: Entry }
+	| { name: "settings" }
+	| { name: "import"; initialUri?: string }
+	| { name: "export" };
 
 /** Lock when the app has been in the background longer than this. */
 const HIDDEN_LOCK_MS = 60_000;
@@ -50,7 +58,16 @@ export function App() {
 
 	switch (view.name) {
 		case "add":
-			return <EntryForm onDone={() => setView({ name: "list" })} />;
+			return (
+				<EntryForm
+					onDone={() => setView({ name: "list" })}
+					onImportMigration={(uri) => setView({ name: "import", initialUri: uri })}
+				/>
+			);
+		case "import":
+			return <ImportView initialUri={view.initialUri} onDone={() => setView({ name: "list" })} />;
+		case "export":
+			return <ExportView onDone={() => setView({ name: "settings" })} />;
 		case "edit":
 			return <EntryForm entry={view.entry} onDone={() => setView({ name: "list" })} />;
 		case "settings":
@@ -61,6 +78,8 @@ export function App() {
 					onSettings={async (s) => { await vault.saveSettings(s); setSettings(s); }}
 					onPinChanged={refreshState}
 					onLock={doLock}
+					onImport={() => setView({ name: "import" })}
+					onExport={() => setView({ name: "export" })}
 					onBack={() => setView({ name: "list" })}
 				/>
 			);
