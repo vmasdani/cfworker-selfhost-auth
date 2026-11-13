@@ -1,4 +1,6 @@
+import { Camera, CameraOff, ImageUp } from "lucide-preact";
 import { useEffect, useRef, useState } from "preact/hooks";
+import { Button, buttonClass, cn } from "./ui/index.tsx";
 import { decodeImageFile, drawToCanvas, getDecoder } from "../lib/qr.ts";
 
 interface Props {
@@ -81,23 +83,23 @@ export function QrScanner({ onResult, hint }: Props) {
 	}
 
 	return (
-		<div class="scanner">
-			<video ref={video} class={camera === "on" ? "" : "hidden"} playsInline muted />
-			{hint && <p class="hint">{hint}</p>}
-			<div class="actions">
+		<div class="scanner grid gap-3">
+			<video ref={video} class={cn("aspect-square w-full rounded-lg bg-black object-cover", camera !== "on" && "hidden")} playsInline muted />
+			{hint && <p class="text-muted-foreground text-sm leading-relaxed">{hint}</p>}
+			<div class="grid grid-cols-2 gap-2">
 				{camera === "on" ? (
-					<button type="button" onClick={() => stopRef.current()}>Stop camera</button>
+					<Button variant="outline" onClick={() => stopRef.current()}><CameraOff /> Stop camera</Button>
 				) : (
-					<button type="button" class="primary" onClick={startCamera} disabled={camera === "starting"}>
-						{camera === "starting" ? "Starting…" : "Scan with camera"}
-					</button>
+					<Button onClick={startCamera} disabled={camera === "starting"}>
+						<Camera /> {camera === "starting" ? "Starting…" : "Scan with camera"}
+					</Button>
 				)}
-				<label class="button">
-					Upload image
+				<label class={buttonClass("outline")}>
+					<ImageUp /> Upload image
 					<input type="file" accept="image/*" multiple hidden onChange={onFile} />
 				</label>
 			</div>
-			{error && <p class="error">{error}</p>}
+			{error && <p class="text-destructive text-sm">{error}</p>}
 		</div>
 	);
 }

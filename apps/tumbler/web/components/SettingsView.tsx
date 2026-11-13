@@ -1,9 +1,11 @@
+import { Download, Lock, Upload } from "lucide-preact";
 import { useState } from "preact/hooks";
-import { MIN_PIN_LENGTH, validatePassword, validatePin } from "../lib/vault-core.ts";
 import { changePassword } from "../lib/account.ts";
+import { MIN_PIN_LENGTH, validatePassword, validatePin } from "../lib/vault-core.ts";
 import { removePin, setPin, type Settings } from "../lib/vault.ts";
 import { AccountSection } from "./AccountSection.tsx";
-import { PinInput, TopBar } from "./ui.tsx";
+import { ErrorText, Hint, Page, PinInput, Section } from "./common.tsx";
+import { Badge, Button, Field, Input, Select, Switch } from "./ui/index.tsx";
 
 interface Props {
 	settings: Settings;
@@ -22,55 +24,55 @@ const CLIPBOARD = [0, 15, 30, 60, 120];
 
 export function SettingsView({ settings, hasPin, onSettings, onPinChanged, onLock, onImport, onExport, onBack, invite }: Props) {
 	return (
-		<div class="shell">
-			<TopBar title="Settings" onBack={onBack} />
-
-			<h2>Sync</h2>
+		<Page title="Settings" onBack={onBack}>
 			<AccountSection invite={invite} onPinMaybeRemoved={() => void onPinChanged()} />
 
-			<h2>Security</h2>
-			<div class="settings-group">
-				<label for="autolock">Auto-lock after inactivity</label>
-				<select id="autolock" value={settings.autoLockMinutes}
-					onChange={(e) => onSettings({ ...settings, autoLockMinutes: Number(e.currentTarget.value) })}>
-					{AUTO_LOCK.map((m) => <option value={m}>{m} minute{m > 1 ? "s" : ""}</option>)}
-				</select>
-				<p class="hint">The vault also locks after 1 minute in the background.</p>
-
-				<label for="clip">Clear copied codes from clipboard</label>
-				<select id="clip" value={settings.clipboardClearSeconds}
-					onChange={(e) => onSettings({ ...settings, clipboardClearSeconds: Number(e.currentTarget.value) })}>
-					{CLIPBOARD.map((s) => <option value={s}>{s === 0 ? "Never" : `After ${s} seconds`}</option>)}
-				</select>
-				<div class="actions"><button onClick={onLock}>Lock now</button></div>
-			</div>
-
-			<h2>Import &amp; export</h2>
-			<div class="settings-group">
-				<p class="hint">
-					Import from Proton Authenticator, Google Authenticator, otpauth:// lists or a Tumbler backup.
-					Export an encrypted backup, or to Proton or Google Authenticator.
-				</p>
-				<div class="actions">
-					<button onClick={onImport}>Import</button>
-					<button onClick={onExport}>Export</button>
+			<Section title="Display">
+				<div class="flex items-center justify-between gap-4">
+					<div class="grid gap-1">
+						<label for="shownext" class="text-sm font-medium">Show next code</label>
+						<Hint class="text-xs">Show the upcoming code under the current one, as Proton Authenticator does.</Hint>
+					</div>
+					<Switch id="shownext" label="Show next code" checked={settings.showNextCode}
+						onChange={(v) => onSettings({ ...settings, showNextCode: v })} />
 				</div>
-			</div>
+			</Section>
 
-			<h2>PIN unlock</h2>
+			<Section title="Security">
+				<Field label="Auto-lock after inactivity" htmlFor="autolock" hint="The vault also locks after 1 minute in the background.">
+					<Select id="autolock" value={settings.autoLockMinutes}
+						onChange={(e) => onSettings({ ...settings, autoLockMinutes: Number(e.currentTarget.value) })}>
+						{AUTO_LOCK.map((m) => <option value={m}>{m} minute{m > 1 ? "s" : ""}</option>)}
+					</Select>
+				</Field>
+				<Field label="Clear copied codes from clipboard" htmlFor="clip">
+					<Select id="clip" value={settings.clipboardClearSeconds}
+						onChange={(e) => onSettings({ ...settings, clipboardClearSeconds: Number(e.currentTarget.value) })}>
+						{CLIPBOARD.map((s) => <option value={s}>{s === 0 ? "Never" : `After ${s} seconds`}</option>)}
+					</Select>
+				</Field>
+				<Button variant="outline" class="w-full" onClick={onLock}><Lock /> Lock now</Button>
+			</Section>
+
+			<Section title="Import & export"
+				description="Import from Proton Authenticator, Google Authenticator, otpauth:// lists or a Tumbler backup. Export an encrypted backup, or to Proton or Google Authenticator.">
+				<div class="grid grid-cols-2 gap-2">
+					<Button variant="outline" onClick={onImport}><Upload /> Import</Button>
+					<Button variant="outline" onClick={onExport}><Download /> Export</Button>
+				</div>
+			</Section>
+
 			<PinSection hasPin={hasPin} onChanged={onPinChanged} />
 
-			<h2>Master password</h2>
 			<PasswordSection />
 
-			<h2>About</h2>
-			<div class="settings-group">
-				<p class="hint">
+			<Section title="About">
+				<Hint>
 					Tumbler Authenticator. Codes are encrypted with AES-256-GCM on this device. With sync, the server
 					stores only ciphertext.
-				</p>
-			</div>
-		</div>
+				</Hint>
+			</Section>
+		</Page>
 	);
 }
 
@@ -107,30 +109,33 @@ function PinSection({ hasPin, onChanged }: { hasPin: boolean; onChanged: () => P
 	}
 
 	return (
-		<div class="settings-group">
-			<p class="hint">
-				{hasPin ? "PIN unlock is on." : "PIN unlock is off."} A PIN is quicker than your master password but weaker:
-				use {MIN_PIN_LENGTH}+ random digits. After 5 wrong PINs, the master password is required.
-			</p>
+		<Section title="PIN unlock">
+			<div class="flex items-start justify-between gap-3">
+				<Hint>
+					{hasPin ? "PIN unlock is on." : "PIN unlock is off."} A PIN is quicker than your master password but weaker:
+					use {MIN_PIN_LENGTH}+ random digits. After 5 wrong PINs, the master password is required.
+				</Hint>
+				<Badge variant={hasPin ? "default" : "secondary"}>{hasPin ? "On" : "Off"}</Badge>
+			</div>
 			{editing ? (
-				<form onSubmit={save}>
-					<label for="newpin">New PIN</label>
-					<PinInput id="newpin" value={pin} onValue={setPinValue} autofocus />
-					<label for="newpin2">Confirm PIN</label>
-					<PinInput id="newpin2" value={confirm} onValue={setConfirm} />
-					<div class="actions">
-						<button type="button" onClick={() => setEditing(false)}>Cancel</button>
-						<button class="primary" type="submit" disabled={busy}>{busy ? "Saving…" : "Save PIN"}</button>
+				<form class="grid gap-4" onSubmit={save}>
+					<Field label="New PIN" htmlFor="newpin"><PinInput id="newpin" value={pin} onValue={setPinValue} autofocus /></Field>
+					<Field label="Confirm PIN" htmlFor="newpin2"><PinInput id="newpin2" value={confirm} onValue={setConfirm} /></Field>
+					<div class="grid grid-cols-2 gap-2">
+						<Button variant="outline" onClick={() => setEditing(false)}>Cancel</Button>
+						<Button type="submit" disabled={busy}>{busy ? "Saving…" : "Save PIN"}</Button>
 					</div>
 				</form>
 			) : (
-				<div class="actions">
-					<button onClick={() => { setEditing(true); setMsg(null); }}>{hasPin ? "Change PIN" : "Set PIN"}</button>
-					{hasPin && <button class="danger" onClick={remove}>Remove PIN</button>}
+				<div class="grid grid-cols-2 gap-2">
+					<Button variant="outline" class={hasPin ? "" : "col-span-2"} onClick={() => { setEditing(true); setMsg(null); }}>
+						{hasPin ? "Change PIN" : "Set PIN"}
+					</Button>
+					{hasPin && <Button variant="destructive-outline" onClick={remove}>Remove PIN</Button>}
 				</div>
 			)}
-			{msg && <p class={msg.error ? "error" : "hint"}>{msg.text}</p>}
-		</div>
+			{msg && (msg.error ? <ErrorText>{msg.text}</ErrorText> : <Hint>{msg.text}</Hint>)}
+		</Section>
 	);
 }
 
@@ -160,23 +165,21 @@ function PasswordSection() {
 	}
 
 	return (
-		<form class="settings-group" onSubmit={save}>
-			<input type="text" name="username" autocomplete="username" value="Tumbler local vault" hidden readOnly />
-			<label for="cur">Current master password</label>
-			<input id="cur" type="password" autocomplete="current-password" value={current}
-				onInput={(e) => setCurrent(e.currentTarget.value)} />
-			<label for="next">New master password</label>
-			<input id="next" type="password" autocomplete="new-password" value={next}
-				onInput={(e) => setNext(e.currentTarget.value)} />
-			<label for="next2">Confirm new master password</label>
-			<input id="next2" type="password" autocomplete="new-password" value={confirm}
-				onInput={(e) => setConfirm(e.currentTarget.value)} />
-			<div class="actions">
-				<button class="primary" type="submit" disabled={busy || !current || !next}>
-					{busy ? "Changing…" : "Change master password"}
-				</button>
-			</div>
-			{msg && <p class={msg.error ? "error" : "hint"}>{msg.text}</p>}
-		</form>
+		<Section title="Master password">
+			<form class="grid gap-4" onSubmit={save}>
+				<input type="text" name="username" autocomplete="username" value="Tumbler local vault" hidden readOnly />
+				<Field label="Current master password" htmlFor="cur">
+					<Input id="cur" type="password" autocomplete="current-password" value={current} onInput={(e) => setCurrent(e.currentTarget.value)} />
+				</Field>
+				<Field label="New master password" htmlFor="next">
+					<Input id="next" type="password" autocomplete="new-password" value={next} onInput={(e) => setNext(e.currentTarget.value)} />
+				</Field>
+				<Field label="Confirm new master password" htmlFor="next2">
+					<Input id="next2" type="password" autocomplete="new-password" value={confirm} onInput={(e) => setConfirm(e.currentTarget.value)} />
+				</Field>
+				<Button type="submit" class="w-full" disabled={busy || !current || !next}>{busy ? "Changing…" : "Change master password"}</Button>
+				{msg && (msg.error ? <ErrorText>{msg.text}</ErrorText> : <Hint>{msg.text}</Hint>)}
+			</form>
+		</Section>
 	);
 }

@@ -11,7 +11,9 @@ import { useState } from "preact/hooks";
 import type { Entry } from "../lib/entries.ts";
 import { deleteEntry, newEntryId, saveEntries } from "../lib/vault.ts";
 import { QrScanner } from "./QrScanner.tsx";
-import { TopBar } from "./ui.tsx";
+import { ErrorText, Page } from "./common.tsx";
+import { Button, Card, Field, Input, Select, Tabs, Textarea } from "./ui/index.tsx";
+import { ChevronRight, KeyRound, Link2, ScanLine, Trash2 } from "lucide-preact";
 
 interface Props {
 	/** Present when editing. */
@@ -113,96 +115,105 @@ export function EntryForm({ entry, onDone, onImportMigration }: Props) {
 	}
 
 	return (
-		<div class="shell">
-			<TopBar title={editing ? "Edit account" : "Add account"} onBack={onDone} />
-			{!editing && (
-				<div class="tabs" role="tablist">
-					<button type="button" class={tab === "scan" ? "active" : ""} onClick={() => setTab("scan")}>Scan QR</button>
-					<button type="button" class={tab === "manual" ? "active" : ""} onClick={() => setTab("manual")}>Enter key</button>
-					<button type="button" class={tab === "uri" ? "active" : ""} onClick={() => setTab("uri")}>Paste URI</button>
-				</div>
-			)}
+		<Page title={editing ? "Edit account" : "Add account"} onBack={onDone}>
+			<div class="grid gap-4">
+				{!editing && (
+					<Tabs
+						value={tab}
+						onChange={(t) => { setTab(t); setError(null); }}
+						items={[
+							{ value: "scan", label: <><ScanLine /> Scan QR</> },
+							{ value: "manual", label: <><KeyRound /> Enter key</> },
+							{ value: "uri", label: <><Link2 /> Paste URI</> },
+						]}
+					/>
+				)}
 
-			{tab === "scan" && !editing ? (
-				<div>
-					<QrScanner onResult={onScan}
-						hint="Scan the 2FA setup QR code shown by the website, or a Google Authenticator transfer code." />
-					{error && <p class="error">{error}</p>}
-				</div>
-			) : tab === "uri" && !editing ? (
-				<div>
-					<label for="uri">otpauth:// URI</label>
-					<textarea id="uri" value={uri} placeholder="otpauth://totp/Issuer:account?secret=…" autocomplete="off"
-						spellcheck={false} onInput={(e) => setUri(e.currentTarget.value)} />
-					{error && <p class="error">{error}</p>}
-					<button class="primary block" type="button" onClick={applyUri} disabled={!uri.trim()}>Read URI</button>
-				</div>
-			) : (
-				<form onSubmit={save}>
-					<label for="issuer">Issuer</label>
-					<input id="issuer" value={draft.issuer} placeholder="e.g. GitHub" autocomplete="off"
-						onInput={(e) => set("issuer", e.currentTarget.value)} />
-					<label for="account">Account</label>
-					<input id="account" value={draft.account} placeholder="e.g. you@example.com" autocomplete="off"
-						onInput={(e) => set("account", e.currentTarget.value)} />
-					{!editing && (
-						<>
-							<label for="secret">Secret key</label>
-							<input id="secret" value={draft.secret} placeholder="Base32, e.g. JBSW Y3DP EHPK 3PXP"
-								autocomplete="off" spellcheck={false} autocapitalize="characters"
-								onInput={(e) => set("secret", e.currentTarget.value)} />
-						</>
-					)}
-					<label for="note">Note</label>
-					<input id="note" value={draft.note} placeholder="Optional" autocomplete="off"
-						onInput={(e) => set("note", e.currentTarget.value)} />
-
-					<details>
-						<summary>Advanced</summary>
-						<div class="row">
-							<div>
-								<label for="type">Type</label>
-								<select id="type" value={draft.type} disabled={editing}
-									onChange={(e) => set("type", e.currentTarget.value as OtpType)}>
-									<option value="totp">Time-based (TOTP)</option>
-									<option value="hotp">Counter-based (HOTP)</option>
-								</select>
-							</div>
-							<div>
-								<label for="alg">Algorithm</label>
-								<select id="alg" value={draft.algorithm} disabled={editing}
-									onChange={(e) => set("algorithm", e.currentTarget.value as OtpAlgorithm)}>
-									<option>SHA1</option>
-									<option>SHA256</option>
-									<option>SHA512</option>
-								</select>
-							</div>
-							<div>
-								<label for="digits">Digits</label>
-								<input id="digits" type="number" min={4} max={10} value={draft.digits} disabled={editing}
-									onInput={(e) => set("digits", e.currentTarget.value)} />
-							</div>
-							{draft.type === "totp" ? (
-								<div>
-									<label for="period">Period (s)</label>
-									<input id="period" type="number" min={1} max={3600} value={draft.period} disabled={editing}
-										onInput={(e) => set("period", e.currentTarget.value)} />
-								</div>
-							) : (
-								<div>
-									<label for="counter">Counter</label>
-									<input id="counter" type="number" min={0} value={draft.counter}
-										onInput={(e) => set("counter", e.currentTarget.value)} />
-								</div>
+				{tab === "scan" && !editing ? (
+					<Card class="px-5">
+						<QrScanner onResult={onScan}
+							hint="Scan the 2FA setup QR code shown by the website, or a Google Authenticator transfer code." />
+						<ErrorText>{error}</ErrorText>
+					</Card>
+				) : tab === "uri" && !editing ? (
+					<Card class="px-5">
+						<Field label="otpauth:// URI" htmlFor="uri">
+							<Textarea id="uri" value={uri} placeholder="otpauth://totp/Issuer:account?secret=…" autocomplete="off"
+								spellcheck={false} onInput={(e) => setUri(e.currentTarget.value)} />
+						</Field>
+						<ErrorText>{error}</ErrorText>
+						<Button class="w-full" onClick={applyUri} disabled={!uri.trim()}>Read URI</Button>
+					</Card>
+				) : (
+					<form onSubmit={save}>
+						<Card class="px-5">
+							<Field label="Issuer" htmlFor="issuer">
+								<Input id="issuer" value={draft.issuer} placeholder="e.g. GitHub" autocomplete="off"
+									onInput={(e) => set("issuer", e.currentTarget.value)} />
+							</Field>
+							<Field label="Account" htmlFor="account">
+								<Input id="account" value={draft.account} placeholder="e.g. you@example.com" autocomplete="off"
+									onInput={(e) => set("account", e.currentTarget.value)} />
+							</Field>
+							{!editing && (
+								<Field label="Secret key" htmlFor="secret">
+									<Input id="secret" class="font-mono" value={draft.secret} placeholder="Base32, e.g. JBSW Y3DP EHPK 3PXP"
+										autocomplete="off" spellcheck={false} autocapitalize="characters"
+										onInput={(e) => set("secret", e.currentTarget.value)} />
+								</Field>
 							)}
-						</div>
-					</details>
+							<Field label="Note" htmlFor="note">
+								<Input id="note" value={draft.note} placeholder="Optional" autocomplete="off"
+									onInput={(e) => set("note", e.currentTarget.value)} />
+							</Field>
 
-					{error && <p class="error">{error}</p>}
-					<button class="primary block" type="submit" disabled={busy}>{editing ? "Save" : "Add account"}</button>
-					{editing && <button class="danger block" type="button" onClick={remove}>Delete account</button>}
-				</form>
-			)}
-		</div>
+							<details class="group">
+								<summary class="text-muted-foreground hover:text-foreground flex cursor-pointer list-none items-center gap-1 text-sm">
+									<ChevronRight class="size-4 transition-transform group-open:rotate-90" /> Advanced
+								</summary>
+								<div class="mt-4 grid grid-cols-2 gap-4">
+									<Field label="Type" htmlFor="type">
+										<Select id="type" value={draft.type} disabled={editing}
+											onChange={(e) => set("type", e.currentTarget.value as OtpType)}>
+											<option value="totp">Time-based (TOTP)</option>
+											<option value="hotp">Counter-based (HOTP)</option>
+										</Select>
+									</Field>
+									<Field label="Algorithm" htmlFor="alg">
+										<Select id="alg" value={draft.algorithm} disabled={editing}
+											onChange={(e) => set("algorithm", e.currentTarget.value as OtpAlgorithm)}>
+											<option>SHA1</option>
+											<option>SHA256</option>
+											<option>SHA512</option>
+										</Select>
+									</Field>
+									<Field label="Digits" htmlFor="digits">
+										<Input id="digits" type="number" min={4} max={10} value={draft.digits} disabled={editing}
+											onInput={(e) => set("digits", e.currentTarget.value)} />
+									</Field>
+									{draft.type === "totp" ? (
+										<Field label="Period (s)" htmlFor="period">
+											<Input id="period" type="number" min={1} max={3600} value={draft.period} disabled={editing}
+												onInput={(e) => set("period", e.currentTarget.value)} />
+										</Field>
+									) : (
+										<Field label="Counter" htmlFor="counter">
+											<Input id="counter" type="number" min={0} value={draft.counter}
+												onInput={(e) => set("counter", e.currentTarget.value)} />
+										</Field>
+									)}
+								</div>
+							</details>
+
+							<ErrorText>{error}</ErrorText>
+							<Button type="submit" class="w-full" disabled={busy}>{editing ? "Save" : "Add account"}</Button>
+							{editing && (
+								<Button variant="destructive-outline" class="w-full" onClick={remove}><Trash2 /> Delete account</Button>
+							)}
+						</Card>
+					</form>
+				)}
+			</div>
+		</Page>
 	);
 }

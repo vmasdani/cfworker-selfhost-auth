@@ -10,7 +10,9 @@ import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { BackupPasswordError, isTumblerBackup, openBackup, type TumblerBackup } from "../lib/backup.ts";
 import { importEntries, listEntries } from "../lib/vault.ts";
 import { QrScanner } from "./QrScanner.tsx";
-import { TopBar } from "./ui.tsx";
+import { ErrorText, Hint, Page } from "./common.tsx";
+import { Alert, Badge, Button, buttonClass, Card, Field, Input, Tabs, Textarea } from "./ui/index.tsx";
+import { CircleCheck, ClipboardPaste, FileUp, QrCode as QrCodeIcon, ScanLine, TriangleAlert } from "lucide-preact";
 
 interface Props {
 	/** A Google migration URI scanned elsewhere, to start with. */
@@ -132,63 +134,67 @@ export function ImportView({ initialUri, onDone }: Props) {
 	const expected = [...batches.values()][0]?.size ?? 0;
 
 	return (
-		<div class="shell">
-			<TopBar title="Import" onBack={onDone} />
-			<div class="tabs" role="tablist">
-				<button type="button" class={mode === "file" ? "active" : ""} onClick={() => setMode("file")}>File</button>
-				<button type="button" class={mode === "google" ? "active" : ""} onClick={() => setMode("google")}>Google QR</button>
-				<button type="button" class={mode === "paste" ? "active" : ""} onClick={() => setMode("paste")}>Paste</button>
+		<Page title="Import" onBack={onDone}>
+			<div class="grid gap-4">
+				<Tabs
+					value={mode}
+					onChange={(m) => { setMode(m); setError(null); }}
+					items={[
+						{ value: "file", label: <><FileUp /> File</> },
+						{ value: "google", label: <><QrCodeIcon /> Google QR</> },
+						{ value: "paste", label: <><ClipboardPaste /> Paste</> },
+					]}
+				/>
+
+				{mode === "file" && (
+					<Card class="px-5">
+						<Hint>
+							Supported: Proton Authenticator export (.json, without password), Tumbler backup (.json),
+							and text files with one otpauth:// or otpauth-migration:// URI per line.
+						</Hint>
+						<label class={buttonClass("default", "default", "w-full")}>
+							<FileUp /> Choose file
+							<input type="file" accept=".json,.txt,application/json,text/plain" hidden onChange={onFile} />
+						</label>
+					</Card>
+				)}
+
+				{mode === "google" && (
+					<Card class="px-5">
+						<Hint>
+							In Google Authenticator: menu → Transfer accounts → Export accounts. Scan each QR code it shows,
+							or upload screenshots of them.
+						</Hint>
+						<QrScanner onResult={addMigration} />
+						{expected > 0 && (
+							<Alert variant="success" icon={<ScanLine />} title={
+								<>Scanned {batches.size} of {expected} QR code{expected > 1 ? "s" : ""}{" · "}
+									{[...batches.values()].reduce((n, b) => n + b.entries.length, 0)} accounts</>
+							}>
+								<div class="mt-1 grid grid-cols-2 gap-2">
+									<Button variant="outline" onClick={() => { batchesRef.current.clear(); rerender((n) => n + 1); }}>Start over</Button>
+									<Button onClick={finishGoogle}>
+										{batches.size >= expected ? "Review accounts" : "Review scanned so far"}
+									</Button>
+								</div>
+							</Alert>
+						)}
+					</Card>
+				)}
+
+				{mode === "paste" && (
+					<Card class="px-5">
+						<Field label="otpauth:// or otpauth-migration:// URIs, one per line" htmlFor="paste">
+							<Textarea id="paste" value={paste} spellcheck={false} autocomplete="off"
+								onInput={(e) => setPaste(e.currentTarget.value)} />
+						</Field>
+						<Button class="w-full" disabled={!paste.trim()} onClick={() => fromText(paste, false)}>Read</Button>
+					</Card>
+				)}
+
+				<ErrorText>{error}</ErrorText>
 			</div>
-
-			{mode === "file" && (
-				<div>
-					<p class="hint">
-						Supported: Proton Authenticator export (.json, without password), Tumbler backup (.json),
-						and text files with one otpauth:// or otpauth-migration:// URI per line.
-					</p>
-					<label class="button primary block">
-						Choose file
-						<input type="file" accept=".json,.txt,application/json,text/plain" hidden onChange={onFile} />
-					</label>
-				</div>
-			)}
-
-			{mode === "google" && (
-				<div>
-					<p class="hint">
-						In Google Authenticator: menu → Transfer accounts → Export accounts. Scan each QR code it shows,
-						or upload screenshots of them.
-					</p>
-					<QrScanner onResult={addMigration} />
-					{expected > 0 && (
-						<div class="notice">
-							Scanned {batches.size} of {expected} QR code{expected > 1 ? "s" : ""}
-							{" · "}
-							{[...batches.values()].reduce((n, b) => n + b.entries.length, 0)} accounts
-							<div class="actions">
-								<button type="button" onClick={() => { batchesRef.current.clear(); rerender((n) => n + 1); }}>Start over</button>
-								<button type="button" class="primary" onClick={finishGoogle}>
-									{batches.size >= expected ? "Review accounts" : "Review scanned so far"}
-								</button>
-							</div>
-						</div>
-					)}
-				</div>
-			)}
-
-			{mode === "paste" && (
-				<div>
-					<label for="paste">otpauth:// or otpauth-migration:// URIs, one per line</label>
-					<textarea id="paste" value={paste} spellcheck={false} autocomplete="off"
-						onInput={(e) => setPaste(e.currentTarget.value)} />
-					<button type="button" class="primary block" disabled={!paste.trim()} onClick={() => fromText(paste, false)}>
-						Read
-					</button>
-				</div>
-			)}
-
-			{error && <p class="error">{error}</p>}
-		</div>
+		</Page>
 	);
 }
 
@@ -212,16 +218,18 @@ function BackupPassword({ backup, onCancel, onOpened }: {
 		}
 	}
 	return (
-		<div class="shell">
-			<TopBar title="Open backup" onBack={onCancel} />
+		<Page title="Open backup" onBack={onCancel}>
 			<form onSubmit={submit}>
-				<p class="hint">Backup created {new Date(backup.createdAt).toLocaleString()}.</p>
-				<label for="bpw">Backup password</label>
-				<input id="bpw" type="password" autocomplete="off" value={pw} autofocus onInput={(e) => setPw(e.currentTarget.value)} />
-				{error && <p class="error">{error}</p>}
-				<button class="primary block" type="submit" disabled={busy || !pw}>{busy ? "Decrypting…" : "Decrypt"}</button>
+				<Card class="px-5">
+					<Hint>Backup created {new Date(backup.createdAt).toLocaleString()}.</Hint>
+					<Field label="Backup password" htmlFor="bpw">
+						<Input id="bpw" type="password" autocomplete="off" value={pw} autofocus onInput={(e) => setPw(e.currentTarget.value)} />
+					</Field>
+					<ErrorText>{error}</ErrorText>
+					<Button type="submit" class="w-full" disabled={busy || !pw}>{busy ? "Decrypting…" : "Decrypt"}</Button>
+				</Card>
 			</form>
-		</div>
+		</Page>
 	);
 }
 
@@ -267,54 +275,55 @@ function ImportPreview({ preview, onBack, onDone }: { preview: Preview; onBack: 
 
 	if (done !== null) {
 		return (
-			<div class="shell">
-				<TopBar title="Import" />
-				<div class="notice">Imported {done} account{done === 1 ? "" : "s"}.</div>
-				{preview.plaintextFile && preview.source !== "tumbler-backup" && (
-					<div class="notice warn">
-						<strong>Delete the export file now.</strong> It contains your 2FA secrets in plain text.
-					</div>
-				)}
-				<button class="primary block" onClick={onDone}>Done</button>
-			</div>
+			<Page title="Import">
+				<div class="grid gap-4">
+					<Alert variant="success" icon={<CircleCheck />} title={`Imported ${done} account${done === 1 ? "" : "s"}.`} />
+					{preview.plaintextFile && preview.source !== "tumbler-backup" && (
+						<Alert variant="warning" icon={<TriangleAlert />} title="Delete the export file now.">
+							It contains your 2FA secrets in plain text.
+						</Alert>
+					)}
+					<Button class="w-full" onClick={onDone}>Done</Button>
+				</div>
+			</Page>
 		);
 	}
 
 	return (
-		<div class="shell">
-			<TopBar title="Review import" onBack={onBack} />
-			<p class="hint">
-				{SOURCE_LABEL[preview.source]} · {preview.entries.length} account{preview.entries.length === 1 ? "" : "s"}
-				{dupes.size > 0 && ` · ${dupes.size} already in your vault (unchecked)`}
-			</p>
-			{preview.warnings.length > 0 && (
-				<div class="notice warn">
-					<strong>{preview.warnings.length} item(s) skipped</strong>
-					<ul>{preview.warnings.map((w) => <li>{w}</li>)}</ul>
+		<Page title="Review import" onBack={onBack}>
+			<div class="grid gap-4">
+				<Hint>
+					{SOURCE_LABEL[preview.source]} · {preview.entries.length} account{preview.entries.length === 1 ? "" : "s"}
+					{dupes.size > 0 && ` · ${dupes.size} already in your vault (unchecked)`}
+				</Hint>
+				{preview.warnings.length > 0 && (
+					<Alert variant="warning" icon={<TriangleAlert />} title={`${preview.warnings.length} item(s) skipped`}>
+						<ul>{preview.warnings.map((w) => <li>{w}</li>)}</ul>
+					</Alert>
+				)}
+				<div class="grid grid-cols-2 gap-2">
+					<Button variant="outline" onClick={() => setSelected(new Set(preview.entries.map((_, i) => i)))}>Select all</Button>
+					<Button variant="outline" onClick={() => setSelected(new Set())}>Select none</Button>
 				</div>
-			)}
-			<div class="actions">
-				<button type="button" onClick={() => setSelected(new Set(preview.entries.map((_, i) => i)))}>Select all</button>
-				<button type="button" onClick={() => setSelected(new Set())}>Select none</button>
+				<ul class="import-list bg-card divide-y rounded-xl border">
+					{preview.entries.map((e, i) => (
+						<li>
+							<label class="flex cursor-pointer items-center gap-3 px-4 py-3">
+								<input type="checkbox" class="size-4 shrink-0 accent-primary" checked={selected.has(i)} onChange={() => toggle(i)} />
+								<span class="grid min-w-0 flex-1">
+									<span class="truncate text-sm font-medium">{e.issuer || e.account || "Unnamed"}</span>
+									{e.issuer && e.account && <span class="text-muted-foreground truncate text-xs">{e.account}</span>}
+								</span>
+								{dupes.has(i) && <Badge variant="warning">duplicate</Badge>}
+								{e.type === "hotp" && <Badge>HOTP</Badge>}
+							</label>
+						</li>
+					))}
+				</ul>
+				<Button class="w-full" disabled={busy || selected.size === 0 || !existing} onClick={doImport}>
+					{busy ? "Importing…" : `Import ${selected.size} account${selected.size === 1 ? "" : "s"}`}
+				</Button>
 			</div>
-			<ul class="import-list">
-				{preview.entries.map((e, i) => (
-					<li>
-						<label class="check">
-							<input type="checkbox" checked={selected.has(i)} onChange={() => toggle(i)} />
-							<span class="meta">
-								<span class="issuer">{e.issuer || e.account || "Unnamed"}</span>
-								{e.issuer && e.account && <span class="account">{e.account}</span>}
-							</span>
-							{dupes.has(i) && <span class="badge">duplicate</span>}
-							{e.type === "hotp" && <span class="badge">HOTP</span>}
-						</label>
-					</li>
-				))}
-			</ul>
-			<button class="primary block" disabled={busy || selected.size === 0 || !existing} onClick={doImport}>
-				{busy ? "Importing…" : `Import ${selected.size} account${selected.size === 1 ? "" : "s"}`}
-			</button>
-		</div>
+		</Page>
 	);
 }

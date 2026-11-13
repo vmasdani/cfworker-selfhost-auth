@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "preact/hooks";
+import { useCallback, useEffect, useRef, useState } from "preact/hooks";
+import { Toaster, toast } from "./components/common.tsx";
 import { Codes } from "./components/Codes.tsx";
 import { EntryForm } from "./components/EntryForm.tsx";
 import { ExportView } from "./components/ExportView.tsx";
@@ -58,50 +59,66 @@ export function App() {
 		if (invite && status === "unlocked") setView({ name: "settings" });
 	}, [invite, status]);
 
-	if (status === "loading") return null;
-	if (status === "setup") return <Setup invite={invite} onDone={() => { setInvite(undefined); void refreshState(); setStatus("unlocked"); }} />;
-	if (status === "locked") {
-		return <Unlock hasPin={hasPin} onUnlocked={() => setStatus("unlocked")} onPinStateChange={refreshState} />;
-	}
+	// Hardware/gesture back (Android): go back to the code list instead of leaving the app.
+	useBackGuard(() => {
+		if (status !== "unlocked" || view.name === "list") return false;
+		setView(view.name === "export" ? { name: "settings" } : { name: "list" });
+		return true;
+	});
 
-	switch (view.name) {
-		case "add":
-			return (
-				<EntryForm
-					onDone={() => setView({ name: "list" })}
-					onImportMigration={(uri) => setView({ name: "import", initialUri: uri })}
-				/>
-			);
-		case "import":
-			return <ImportView initialUri={view.initialUri} onDone={() => setView({ name: "list" })} />;
-		case "export":
-			return <ExportView onDone={() => setView({ name: "settings" })} />;
-		case "edit":
-			return <EntryForm entry={view.entry} onDone={() => setView({ name: "list" })} />;
-		case "settings":
-			return (
-				<SettingsView
-					settings={settings}
-					hasPin={hasPin}
-					onSettings={async (s) => { await vault.saveSettings(s); setSettings(s); }}
-					onPinChanged={refreshState}
-					onLock={doLock}
-					onImport={() => setView({ name: "import" })}
-					onExport={() => setView({ name: "export" })}
-					onBack={() => { setInvite(undefined); setView({ name: "list" }); }}
-					invite={invite}
-				/>
-			);
-		default:
-			return (
-				<Codes
-					settings={settings}
-					onAdd={() => setView({ name: "add" })}
-					onEdit={(entry) => setView({ name: "edit", entry })}
-					onSettings={() => setView({ name: "settings" })}
-					onLock={doLock}
-				/>
-			);
+	return (
+		<>
+			{screen()}
+			<Toaster />
+		</>
+	);
+
+	function screen() {
+		if (status === "loading") return null;
+		if (status === "setup") return <Setup invite={invite} onDone={() => { setInvite(undefined); void refreshState(); setStatus("unlocked"); }} />;
+		if (status === "locked") {
+			return <Unlock hasPin={hasPin} onUnlocked={() => setStatus("unlocked")} onPinStateChange={refreshState} />;
+		}
+
+		switch (view.name) {
+			case "add":
+				return (
+					<EntryForm
+						onDone={() => setView({ name: "list" })}
+						onImportMigration={(uri) => setView({ name: "import", initialUri: uri })}
+					/>
+				);
+			case "import":
+				return <ImportView initialUri={view.initialUri} onDone={() => setView({ name: "list" })} />;
+			case "export":
+				return <ExportView onDone={() => setView({ name: "settings" })} />;
+			case "edit":
+				return <EntryForm entry={view.entry} onDone={() => setView({ name: "list" })} />;
+			case "settings":
+				return (
+					<SettingsView
+						settings={settings}
+						hasPin={hasPin}
+						onSettings={async (s) => { await vault.saveSettings(s); setSettings(s); }}
+						onPinChanged={refreshState}
+						onLock={doLock}
+						onImport={() => setView({ name: "import" })}
+						onExport={() => setView({ name: "export" })}
+						onBack={() => { setInvite(undefined); setView({ name: "list" }); }}
+						invite={invite}
+					/>
+				);
+			default:
+				return (
+					<Codes
+						settings={settings}
+						onAdd={() => setView({ name: "add" })}
+						onEdit={(entry) => setView({ name: "edit", entry })}
+						onSettings={() => setView({ name: "settings" })}
+						onLock={doLock}
+					/>
+				);
+		}
 	}
 }
 
@@ -111,6 +128,41 @@ function readInviteFromHash(): string | undefined {
 	if (!m) return undefined;
 	history.replaceState(null, "", location.pathname + location.search);
 	return m[1];
+}
+
+/**
+ * Keep one extra history entry so the back button lands in the app instead of leaving it. Firefox
+ * Android PWAs otherwise show a blank page. `handle` returns true if it navigated inside the app.
+ * At the top level, the first press shows a hint; a second press within 2 s tries to close the app,
+ * and if the browser does not allow that, stays rather than going to a blank page.
+ */
+function useBackGuard(handle: () => boolean) {
+	const ref = useRef(handle);
+	ref.current = handle;
+	useEffect(() => {
+		const guard = () => history.pushState({ tumblerGuard: true }, "");
+		if (!(history.state as { tumblerGuard?: boolean } | null)?.tumblerGuard) guard();
+		let armedUntil = 0;
+		const onPop = () => {
+			if (ref.current()) return guard();
+			if (Date.now() < armedUntil) {
+				armedUntil = 0;
+				window.close();
+				setTimeout(() => {
+					if (!document.hidden) {
+						guard();
+						toast("Use your phone's home or app switcher to leave");
+					}
+				}, 300);
+				return;
+			}
+			armedUntil = Date.now() + 2000;
+			toast("Press back again to exit");
+			guard();
+		};
+		window.addEventListener("popstate", onPop);
+		return () => window.removeEventListener("popstate", onPop);
+	}, []);
 }
 
 /** Sync on unlock, shortly after local edits, when coming back online, and every 5 minutes. */

@@ -3,6 +3,9 @@ import { joinWithInvite, recoverAccount, signIn, TotpRequiredError } from "../li
 import { MIN_PASSWORD_LENGTH, validatePassword } from "../lib/vault-core.ts";
 import { copySecret } from "../lib/clipboard.ts";
 import * as vault from "../lib/vault.ts";
+import { ErrorText, Hint } from "./common.tsx";
+import { Alert, Button, Checkbox, Input, Label } from "./ui/index.tsx";
+import { Copy, TriangleAlert } from "lucide-preact";
 
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -39,25 +42,25 @@ export function SignInForm({ username: initialUser = "", onDone, note }: { usern
 	}
 
 	return (
-		<form onSubmit={submit}>
-			{note && <p class="hint">{note}</p>}
-			<label for="si-user">Username</label>
-			<input id="si-user" autocomplete="username" autocapitalize="none" spellcheck={false} value={username}
+		<form class="grid gap-3" onSubmit={submit}>
+			<Hint>{note}</Hint>
+			<Label class="mt-1" for="si-user">Username</Label>
+			<Input id="si-user" autocomplete="username" autocapitalize="none" spellcheck={false} value={username}
 				readOnly={!!initialUser} onInput={(e) => setUsername(e.currentTarget.value)} />
-			<label for="si-pw">Password</label>
-			<input id="si-pw" type="password" autocomplete="current-password" value={password}
+			<Label class="mt-1" for="si-pw">Password</Label>
+			<Input id="si-pw" type="password" autocomplete="current-password" value={password}
 				onInput={(e) => setPassword(e.currentTarget.value)} />
 			{needTotp && (
 				<>
-					<label for="si-totp">Two-step login code</label>
-					<input id="si-totp" inputMode="numeric" pattern="[0-9]*" autocomplete="one-time-code" maxLength={6} value={totp} autofocus
+					<Label class="mt-1" for="si-totp">Two-step login code</Label>
+					<Input id="si-totp" inputMode="numeric" pattern="[0-9]*" autocomplete="one-time-code" maxLength={6} value={totp} autofocus
 						onInput={(e) => setTotp(e.currentTarget.value.replace(/\D/g, ""))} />
 				</>
 			)}
-			{error && <p class="error">{error}</p>}
-			<button class="primary block" type="submit" disabled={busy || !username || !password || (needTotp && totp.length !== 6)}>
+			<ErrorText>{error}</ErrorText>
+			<Button type="submit" class="mt-1 w-full" disabled={busy || !username || !password || (needTotp && totp.length !== 6)}>
 				{busy ? "Signing in…" : "Sign in"}
-			</button>
+			</Button>
 		</form>
 	);
 }
@@ -95,32 +98,32 @@ export function JoinForm({ invite: initialInvite = "", createLocal, onRecoveryKe
 	}
 
 	return (
-		<form onSubmit={submit}>
+		<form class="grid gap-3" onSubmit={submit}>
 			{!initialInvite && (
 				<>
-					<label for="j-inv">Invite link</label>
-					<input id="j-inv" autocomplete="off" spellcheck={false} value={invite} placeholder="https://…/#invite=…"
+					<Label class="mt-1" for="j-inv">Invite link</Label>
+					<Input id="j-inv" autocomplete="off" spellcheck={false} value={invite} placeholder="https://…/#invite=…"
 						onInput={(e) => setInvite(e.currentTarget.value)} />
 				</>
 			)}
-			<label for="j-user">Choose a username</label>
-			<input id="j-user" autocomplete="username" autocapitalize="none" spellcheck={false} value={username}
+			<Label class="mt-1" for="j-user">Choose a username</Label>
+			<Input id="j-user" autocomplete="username" autocapitalize="none" spellcheck={false} value={username}
 				onInput={(e) => setUsername(e.currentTarget.value)} />
-			<p class="hint">3–64 characters: a–z, 0–9, ".", "_" or "-".</p>
-			<label for="j-pw">{createLocal ? "Choose a password" : "Account password"}</label>
-			<input id="j-pw" type="password" autocomplete="new-password" value={password}
+			<Hint class="text-xs">3–64 characters: a–z, 0–9, ".", "_" or "-".</Hint>
+			<Label class="mt-1" for="j-pw">{createLocal ? "Choose a password" : "Account password"}</Label>
+			<Input id="j-pw" type="password" autocomplete="new-password" value={password}
 				onInput={(e) => setPassword(e.currentTarget.value)} />
-			<p class="hint">
+			<Hint class="text-xs">
 				At least {MIN_PASSWORD_LENGTH} characters; a memorable passphrase works well.
 				{!createLocal && " It becomes the master password on this device too."}
-			</p>
-			<label for="j-pw2">Confirm password</label>
-			<input id="j-pw2" type="password" autocomplete="new-password" value={confirm}
+			</Hint>
+			<Label class="mt-1" for="j-pw2">Confirm password</Label>
+			<Input id="j-pw2" type="password" autocomplete="new-password" value={confirm}
 				onInput={(e) => setConfirm(e.currentTarget.value)} />
-			{error && <p class="error">{error}</p>}
-			<button class="primary block" type="submit" disabled={busy || !invite || !username || !password}>
+			<ErrorText>{error}</ErrorText>
+			<Button type="submit" class="mt-1 w-full" disabled={busy || !invite || !username || !password}>
 				{busy ? "Creating account…" : "Create account"}
-			</button>
+			</Button>
 		</form>
 	);
 }
@@ -149,24 +152,24 @@ export function RecoverForm({ username: initialUser = "", onDone }: { username?:
 	}
 
 	return (
-		<form onSubmit={submit}>
-			<p class="hint">Sets a new password using the recovery key you saved when the account was created. Two-step login is turned off; turn it on again afterwards.</p>
-			<label for="r-user">Username</label>
-			<input id="r-user" autocomplete="username" autocapitalize="none" spellcheck={false} value={username}
+		<form class="grid gap-3" onSubmit={submit}>
+			<Hint>Sets a new password using the recovery key you saved when the account was created. Two-step login is turned off; turn it on again afterwards.</Hint>
+			<Label class="mt-1" for="r-user">Username</Label>
+			<Input id="r-user" autocomplete="username" autocapitalize="none" spellcheck={false} value={username}
 				readOnly={!!initialUser} onInput={(e) => setUsername(e.currentTarget.value)} />
-			<label for="r-key">Recovery key</label>
-			<input id="r-key" class="mono" autocomplete="off" autocapitalize="characters" spellcheck={false} value={key}
+			<Label class="mt-1" for="r-key">Recovery key</Label>
+			<Input id="r-key" class="font-mono" autocomplete="off" autocapitalize="characters" spellcheck={false} value={key}
 				placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX" onInput={(e) => setKey(e.currentTarget.value)} />
-			<label for="r-pw">New password</label>
-			<input id="r-pw" type="password" autocomplete="new-password" value={password}
+			<Label class="mt-1" for="r-pw">New password</Label>
+			<Input id="r-pw" type="password" autocomplete="new-password" value={password}
 				onInput={(e) => setPassword(e.currentTarget.value)} />
-			<label for="r-pw2">Confirm new password</label>
-			<input id="r-pw2" type="password" autocomplete="new-password" value={confirm}
+			<Label class="mt-1" for="r-pw2">Confirm new password</Label>
+			<Input id="r-pw2" type="password" autocomplete="new-password" value={confirm}
 				onInput={(e) => setConfirm(e.currentTarget.value)} />
-			{error && <p class="error">{error}</p>}
-			<button class="primary block" type="submit" disabled={busy || !username || !key || !password}>
+			<ErrorText>{error}</ErrorText>
+			<Button type="submit" class="mt-1 w-full" disabled={busy || !username || !key || !password}>
 				{busy ? "Recovering…" : "Set new password"}
-			</button>
+			</Button>
 		</form>
 	);
 }
@@ -176,25 +179,19 @@ export function RecoveryKeyView({ recoveryKey, onDone }: { recoveryKey: string; 
 	const [saved, setSaved] = useState(false);
 	const [copied, setCopied] = useState(false);
 	return (
-		<div>
-			<div class="notice warn">
-				<strong>Save your recovery key now. It is shown only once.</strong> It is the only way back into your
-				account if you forget your password. Store it in a password manager (e.g. Bitwarden, Proton Pass) or
-				write it down and keep it offline.
-			</div>
-			<p class="recovery-key mono" aria-label="Recovery key">
+		<div class="grid gap-4">
+			<Alert variant="warning" icon={<TriangleAlert />} title="Save your recovery key now. It is shown only once.">
+				It is the only way back into your account if you forget your password. Store it in a password manager (e.g.
+				Bitwarden, Proton Pass) or write it down and keep it offline.
+			</Alert>
+			<p class="bg-muted rounded-lg border border-dashed px-4 py-4 text-center font-mono text-lg tracking-wide" aria-label="Recovery key">
 				{recoveryKey.split("-").map((g, i) => (i ? <>-<wbr />{g}</> : g))}
 			</p>
-			<div class="actions">
-				<button type="button" onClick={async () => { await copySecret(recoveryKey, 120); setCopied(true); }}>
-					{copied ? "Copied (clears in 2 min)" : "Copy"}
-				</button>
-			</div>
-			<label class="check">
-				<input type="checkbox" checked={saved} onChange={(e) => setSaved(e.currentTarget.checked)} />
-				I saved my recovery key
-			</label>
-			<button class="primary block" disabled={!saved} onClick={onDone}>Continue</button>
+			<Button variant="outline" class="w-full" onClick={async () => { await copySecret(recoveryKey, 120); setCopied(true); }}>
+				<Copy /> {copied ? "Copied (clears in 2 min)" : "Copy"}
+			</Button>
+			<Checkbox checked={saved} onChange={(e) => setSaved(e.currentTarget.checked)}>I saved my recovery key</Checkbox>
+			<Button class="w-full" disabled={!saved} onClick={onDone}>Continue</Button>
 		</div>
 	);
 }

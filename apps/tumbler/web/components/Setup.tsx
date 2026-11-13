@@ -1,8 +1,10 @@
+import { TriangleAlert } from "lucide-preact";
 import { useState } from "preact/hooks";
 import { createVault } from "../lib/vault.ts";
 import { MIN_PASSWORD_LENGTH, MIN_PIN_LENGTH, validatePassword, validatePin } from "../lib/vault-core.ts";
 import { JoinForm, RecoverForm, RecoveryKeyView, SignInForm } from "./AccountForms.tsx";
-import { Brand, PinInput } from "./ui.tsx";
+import { AuthScreen, ErrorText, PinInput } from "./common.tsx";
+import { Alert, Button, Checkbox, Field, Input } from "./ui/index.tsx";
 
 type Mode = "create" | "signin" | "join" | "recover";
 
@@ -17,30 +19,24 @@ export function Setup({ onDone, invite }: { onDone: () => void; invite?: string 
 	};
 	if (recoveryKey) {
 		return (
-			<div class="centered">
-				<div class="card">
-					<Brand subtitle="Account created" />
-					<RecoveryKeyView recoveryKey={recoveryKey} onDone={onDone} />
-				</div>
-			</div>
+			<AuthScreen subtitle="Account created">
+				<RecoveryKeyView recoveryKey={recoveryKey} onDone={onDone} />
+			</AuthScreen>
 		);
 	}
 	return (
-		<div class="centered">
-			<div class="card">
-				<Brand subtitle={subtitle[mode]} />
-				{mode === "create" && <CreateVault onDone={onDone} />}
-				{mode === "signin" && <SignInForm onDone={onDone} />}
-				{mode === "join" && <JoinForm invite={invite} createLocal onRecoveryKey={setRecoveryKey} />}
-				{mode === "recover" && <RecoverForm onDone={onDone} />}
-				<div class="mode-links">
-					{mode !== "create" && <button class="link" onClick={() => setMode("create")}>Use without an account</button>}
-					{mode !== "signin" && <button class="link" onClick={() => setMode("signin")}>Sign in to sync</button>}
-					{mode !== "join" && <button class="link" onClick={() => setMode("join")}>I have an invite link</button>}
-					{mode === "signin" && <button class="link" onClick={() => setMode("recover")}>Forgot password?</button>}
-				</div>
+		<AuthScreen subtitle={subtitle[mode]}>
+			{mode === "create" && <CreateVault onDone={onDone} />}
+			{mode === "signin" && <SignInForm onDone={onDone} />}
+			{mode === "join" && <JoinForm invite={invite} createLocal onRecoveryKey={setRecoveryKey} />}
+			{mode === "recover" && <RecoverForm onDone={onDone} />}
+			<div class="flex flex-wrap justify-center gap-x-4 gap-y-1">
+				{mode !== "create" && <Button variant="link" onClick={() => setMode("create")}>Use without an account</Button>}
+				{mode !== "signin" && <Button variant="link" onClick={() => setMode("signin")}>Sign in to sync</Button>}
+				{mode !== "join" && <Button variant="link" onClick={() => setMode("join")}>I have an invite link</Button>}
+				{mode === "signin" && <Button variant="link" onClick={() => setMode("recover")}>Forgot password?</Button>}
 			</div>
-		</div>
+		</AuthScreen>
 	);
 }
 
@@ -73,40 +69,35 @@ function CreateVault({ onDone }: { onDone: () => void }) {
 	}
 
 	return (
-		<form onSubmit={submit}>
-				<input type="text" name="username" autocomplete="username" value="Tumbler local vault" hidden readOnly />
-
-				<label for="pw">Master password</label>
-				<input id="pw" type="password" autocomplete="new-password" value={password}
+		<form class="grid gap-4" onSubmit={submit}>
+			<input type="text" name="username" autocomplete="username" value="Tumbler local vault" hidden readOnly />
+			<Field label="Master password" htmlFor="pw" hint={`At least ${MIN_PASSWORD_LENGTH} characters. A long passphrase is best.`}>
+				<Input id="pw" type="password" autocomplete="new-password" value={password}
 					onInput={(e) => setPassword(e.currentTarget.value)} autofocus />
-				<p class="hint">At least {MIN_PASSWORD_LENGTH} characters. A long passphrase is best.</p>
-
-				<label for="pw2">Confirm master password</label>
-				<input id="pw2" type="password" autocomplete="new-password" value={confirm}
+			</Field>
+			<Field label="Confirm master password" htmlFor="pw2">
+				<Input id="pw2" type="password" autocomplete="new-password" value={confirm}
 					onInput={(e) => setConfirm(e.currentTarget.value)} />
-
-				<label class="check">
-					<input type="checkbox" checked={usePin} onChange={(e) => setUsePin(e.currentTarget.checked)} />
-					Also unlock with a PIN on this device
-				</label>
-				{usePin && (
-					<>
-						<label for="pin">PIN ({MIN_PIN_LENGTH}+ digits)</label>
+			</Field>
+			<Checkbox checked={usePin} onChange={(e) => setUsePin(e.currentTarget.checked)}>
+				Also unlock with a PIN on this device
+			</Checkbox>
+			{usePin && (
+				<>
+					<Field label={`PIN (${MIN_PIN_LENGTH}+ digits)`} htmlFor="pin">
 						<PinInput id="pin" value={pin} onValue={setPin} />
-						<label for="pin2">Confirm PIN</label>
+					</Field>
+					<Field label="Confirm PIN" htmlFor="pin2">
 						<PinInput id="pin2" value={pinConfirm} onValue={setPinConfirm} />
-					</>
-				)}
-
-				{error && <p class="error">{error}</p>}
-				<button class="primary block" type="submit" disabled={busy}>
-					{busy ? "Creating vault…" : "Create vault"}
-				</button>
-
-				<div class="notice warn">
-					<strong>There is no password recovery for a local vault.</strong> Save your master password in a
-					password manager such as Bitwarden or Proton Pass. Codes are encrypted and stored only on this device.
-				</div>
-			</form>
+					</Field>
+				</>
+			)}
+			<ErrorText>{error}</ErrorText>
+			<Button type="submit" class="w-full" disabled={busy}>{busy ? "Creating vault…" : "Create vault"}</Button>
+			<Alert variant="warning" icon={<TriangleAlert />} title="There is no password recovery for a local vault.">
+				Save your master password in a password manager such as Bitwarden or Proton Pass. Codes are encrypted and
+				stored only on this device.
+			</Alert>
+		</form>
 	);
 }

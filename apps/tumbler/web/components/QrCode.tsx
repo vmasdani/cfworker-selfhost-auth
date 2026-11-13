@@ -10,7 +10,7 @@ export function QrCode({ value, label }: { value: string; label: string }) {
 		return { path: d, size: qr.size };
 	}, [value]);
 	return (
-		<svg class="qr" viewBox={`0 0 ${size} ${size}`} role="img" aria-label={label} shape-rendering="crispEdges">
+		<svg class="qr mx-auto block w-full max-w-72 rounded-lg" viewBox={`0 0 ${size} ${size}`} role="img" aria-label={label} shape-rendering="crispEdges">
 			<rect width={size} height={size} fill="#fff" />
 			<path d={path} fill="#000" />
 		</svg>

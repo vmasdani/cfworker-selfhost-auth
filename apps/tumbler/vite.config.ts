@@ -1,5 +1,6 @@
 import { cloudflare } from "@cloudflare/vite-plugin";
 import preact from "@preact/preset-vite";
+import tailwindcss from "@tailwindcss/vite";
 import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -30,5 +31,5 @@ function serviceWorker(): Plugin {
 }
 
 export default defineConfig({
-	plugins: [preact(), cloudflare(), serviceWorker()],
+	plugins: [preact(), tailwindcss(), cloudflare(), serviceWorker()],
 });

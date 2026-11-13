@@ -1,8 +1,10 @@
+import { CircleCheck } from "lucide-preact";
 import { useEffect, useState } from "preact/hooks";
-import { PinError, unlockWithPassword, unlockWithPin } from "../lib/vault.ts";
 import { getAccount } from "../lib/account.ts";
+import { PinError, unlockWithPassword, unlockWithPin } from "../lib/vault.ts";
 import { RecoverForm } from "./AccountForms.tsx";
-import { Brand, PinInput } from "./ui.tsx";
+import { AuthScreen, ErrorText, PinInput } from "./common.tsx";
+import { Alert, Button, Field, Input } from "./ui/index.tsx";
 
 interface Props {
 	hasPin: boolean;
@@ -45,47 +47,41 @@ export function Unlock({ hasPin, onUnlocked, onPinStateChange }: Props) {
 
 	if (recovering && linkedUser) {
 		return (
-			<div class="centered">
-				<div class="card">
-					<Brand subtitle="Recover your account" />
-					<RecoverForm username={linkedUser} onDone={() => { setRecovering(false); setRecovered(true); setMode("password"); }} />
-					<button class="link" onClick={() => setRecovering(false)}>Back</button>
-				</div>
-			</div>
+			<AuthScreen subtitle="Recover your account">
+				<RecoverForm username={linkedUser} onDone={() => { setRecovering(false); setRecovered(true); setMode("password"); }} />
+				<Button variant="link" onClick={() => setRecovering(false)}>Back</Button>
+			</AuthScreen>
 		);
 	}
 
 	return (
-		<div class="centered">
-			<form class="card" onSubmit={submit}>
-				<Brand subtitle="Vault locked" />
-				{recovered && <div class="notice">Password changed. Unlock with your new password.</div>}
+		<AuthScreen subtitle="Vault locked">
+			<form class="grid gap-4" onSubmit={submit}>
+				{recovered && <Alert variant="success" icon={<CircleCheck />}>Password changed. Unlock with your new password.</Alert>}
 				<input type="text" name="username" autocomplete="username" value="Tumbler local vault" hidden readOnly />
 				{pinMode ? (
-					<>
-						<label for="unlock">PIN</label>
+					<Field label="PIN" htmlFor="unlock">
 						<PinInput key="pin" id="unlock" value={value} onValue={setValue} autofocus />
-					</>
+					</Field>
 				) : (
-					<>
-						<label for="unlock">Master password</label>
-						<input id="unlock" key="pw" type="password" autocomplete="current-password" value={value}
+					<Field label="Master password" htmlFor="unlock">
+						<Input id="unlock" key="pw" type="password" autocomplete="current-password" value={value}
 							onInput={(e) => setValue(e.currentTarget.value)} autofocus />
-					</>
+					</Field>
 				)}
-				{error && <p class="error">{error}</p>}
-				<button class="primary block" type="submit" disabled={busy || !value}>
-					{busy ? "Unlocking…" : "Unlock"}
-				</button>
-				{hasPin && (
-					<button type="button" class="link" onClick={() => { setMode(pinMode ? "password" : "pin"); setValue(""); setError(null); }}>
-						{pinMode ? "Use master password instead" : "Use PIN instead"}
-					</button>
-				)}
-				{linkedUser && !pinMode && (
-					<button type="button" class="link" onClick={() => setRecovering(true)}>Forgot password? Use recovery key</button>
-				)}
+				<ErrorText>{error}</ErrorText>
+				<Button type="submit" class="w-full" disabled={busy || !value}>{busy ? "Unlocking…" : "Unlock"}</Button>
+				<div class="flex flex-col items-center gap-1">
+					{hasPin && (
+						<Button variant="link" onClick={() => { setMode(pinMode ? "password" : "pin"); setValue(""); setError(null); }}>
+							{pinMode ? "Use master password instead" : "Use PIN instead"}
+						</Button>
+					)}
+					{linkedUser && !pinMode && (
+						<Button variant="link" onClick={() => setRecovering(true)}>Forgot password? Use recovery key</Button>
+					)}
+				</div>
 			</form>
-		</div>
+		</AuthScreen>
 	);
 }

@@ -18,9 +18,11 @@ import {
 export interface Settings {
 	autoLockMinutes: number;
 	clipboardClearSeconds: number;
+	/** Show the upcoming TOTP code under the current one. */
+	showNextCode: boolean;
 }
 
-export const DEFAULT_SETTINGS: Settings = { autoLockMinutes: 5, clipboardClearSeconds: 30 };
+export const DEFAULT_SETTINGS: Settings = { autoLockMinutes: 5, clipboardClearSeconds: 30, showNextCode: true };
 
 export class PinError extends Error {
 	override name = "PinError";
