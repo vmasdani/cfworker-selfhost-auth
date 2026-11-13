@@ -1,0 +1,23 @@
+{
+	"name": "@cfsa/tumbler",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "cf dev",
+		"build": "cf build",
+		"deploy": "cf deploy",
+		"db:migrate:local": "cf d1 migrations apply tumbler-db --local",
+		"typecheck": "cf workers types && tsc -p tsconfig.worker.json && tsc -p tsconfig.web.json"
+	},
+	"dependencies": {
+		"hono": "^4.13.18",
+		"preact": "^11.2.0"
+	},
+	"devDependencies": {
+		"@cloudflare/vite-plugin": "^2.0.0-beta.v.16",
+		"@preact/preset-vite": "^2.10.6",
+		"cf": "^1.0.0-beta.31",
+		"typescript": "^7.0.2",
+		"vite": "^8.3.8"
+	}
+}

@@ -1,0 +1,2 @@
+# Copy to .dev.vars for local development. Generate with: openssl rand -base64 32
+SERVER_SECRET=change-me
