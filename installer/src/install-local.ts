@@ -1,8 +1,9 @@
-// Install or upgrade Tumbler on a Cloudflare account. Idempotent: re-running upgrades in place.
+// Install or upgrade an app from this repo (Tumbler, Coffer) on a Cloudflare account.
+// Idempotent: re-running upgrades in place.
 //
 //   1. account (cf profile + account id)
 //   2. optional custom domain: zone must be in the account; no conflicting DNS record
-//   3. D1 `tumbler-db`: reuse by name, or create (asks first)
+//   3. D1 `<app>-db`: reuse by name, or create (asks first)
 //   4. apply D1 migrations
 //   5. secrets: SERVER_SECRET only if missing (never rotated: every login verifier depends on it);
 //      ADMIN_SETUP_TOKEN fresh on every run (it only works while the server has no users, so rotating is
@@ -30,11 +31,24 @@ import { generateSecret } from "./lib/password.ts";
 import { ClaimError } from "./nodewarden.ts";
 import { waitHealthy } from "./lib/wait.ts";
 
-const APP_DIR = join(import.meta.dir, "..", "..", "apps", "tumbler");
-const WORKER = "tumbler";
-const DB_NAME = "tumbler-db";
+export interface LocalApp {
+	id: "tumbler" | "coffer";
+	name: string;
+	/** Worker name and D1 database name, as in the app's cloudflare.config.ts. */
+	worker: string;
+	db: string;
+	/** Prefix of the env vars the app's cloudflare.config.ts reads: <PREFIX>_D1_ID, <PREFIX>_DOMAIN. */
+	envPrefix: string;
+	/** Where to invite more users, shown after an upgrade. */
+	inviteHint: string;
+}
 
-export interface TumblerInstallOptions {
+export const LOCAL_APPS: Record<LocalApp["id"], LocalApp> = {
+	tumbler: { id: "tumbler", name: "Tumbler", worker: "tumbler", db: "tumbler-db", envPrefix: "TUMBLER", inviteHint: "Settings → Sync → Invite users" },
+	coffer: { id: "coffer", name: "Coffer", worker: "coffer", db: "coffer-db", envPrefix: "COFFER", inviteHint: "Account → Invite users" },
+};
+
+export interface LocalInstallOptions {
 	ctx: CfContext;
 	domain?: string;
 	dryRun: boolean;
@@ -43,7 +57,7 @@ export interface TumblerInstallOptions {
 	log: (msg: string) => void;
 }
 
-export interface TumblerInstallResult {
+export interface LocalInstallResult {
 	url: string | null;
 	setupToken: string | null;
 	firstInstall: boolean;
@@ -57,8 +71,11 @@ export function normalizeDomain(input: string): string {
 	return d;
 }
 
-export async function installTumbler(o: TumblerInstallOptions): Promise<TumblerInstallResult> {
+export async function installLocal(app: LocalApp, o: LocalInstallOptions): Promise<LocalInstallResult> {
 	const { ctx, log } = o;
+	const APP_DIR = join(import.meta.dir, "..", "..", "apps", app.id);
+	const WORKER = app.worker;
+	const DB_NAME = app.db;
 	const env: Record<string, string> = {};
 
 	const existingSecrets = await workerSecretNames(ctx, WORKER);
@@ -79,7 +96,7 @@ export async function installTumbler(o: TumblerInstallOptions): Promise<TumblerI
 			throw new ClaimError(`${o.domain} is already the custom domain of another Worker. Pick another hostname.`);
 		}
 		log(`✓ domain ${o.domain} (zone ${zone.name})`);
-		env.TUMBLER_DOMAIN = o.domain;
+		env[`${app.envPrefix}_DOMAIN`] = o.domain;
 	} else {
 		log("• no custom domain: serving on workers.dev");
 	}
@@ -93,7 +110,7 @@ export async function installTumbler(o: TumblerInstallOptions): Promise<TumblerI
 		db = await createD1(ctx, DB_NAME);
 		log(`✓ created D1 ${DB_NAME} (${db.uuid})`);
 	}
-	if (db) env.TUMBLER_D1_ID = db.uuid;
+	if (db) env[`${app.envPrefix}_D1_ID`] = db.uuid;
 
 	// 4. migrations
 	if (db && !o.dryRun) {

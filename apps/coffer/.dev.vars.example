@@ -1,0 +1,3 @@
+# Copy to .dev.vars for local development. Generate each with: openssl rand -base64 32
+SERVER_SECRET=change-me-to-32-plus-random-characters
+ADMIN_SETUP_TOKEN=change-me-to-32-plus-random-characters

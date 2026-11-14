@@ -16,6 +16,8 @@
 		"@cfsa/importers": "workspace:*",
 		"@cfsa/server-kit": "workspace:*",
 		"@cfsa/totp": "workspace:*",
+		"@cfsa/ui": "workspace:*",
+		"@cfsa/worker-accounts": "workspace:*",
 		"clsx": "^2.1.1",
 		"hono": "^4.13.18",
 		"jsqr": "^1.4.0",

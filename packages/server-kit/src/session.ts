@@ -2,6 +2,7 @@
 
 import { randomBytes, sha256, toB64, toB64Url, utf8 } from "@cfsa/crypto";
 
+/** Default cookie name (Tumbler). Other apps pass their own, e.g. "__Host-coffer_session". */
 export const SESSION_COOKIE = "__Host-tumbler_session";
 export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 /** Extend a session's expiry at most once per this interval, to limit writes. */
@@ -55,19 +56,19 @@ export async function deleteOtherSessions(db: D1Database, userId: string, keepId
 	await db.prepare("DELETE FROM sessions WHERE user_id = ? AND id IS NOT ?").bind(userId, keepId).run();
 }
 
-export function sessionCookie(token: string): string {
-	return `${SESSION_COOKIE}=${token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${SESSION_TTL_MS / 1000}`;
+export function sessionCookie(token: string, name = SESSION_COOKIE): string {
+	return `${name}=${token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${SESSION_TTL_MS / 1000}`;
 }
 
-export function clearSessionCookie(): string {
-	return `${SESSION_COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0`;
+export function clearSessionCookie(name = SESSION_COOKIE): string {
+	return `${name}=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0`;
 }
 
-export function readSessionCookie(header: string | null | undefined): string | null {
+export function readSessionCookie(header: string | null | undefined, name = SESSION_COOKIE): string | null {
 	if (!header) return null;
 	for (const part of header.split(";")) {
 		const [k, ...v] = part.trim().split("=");
-		if (k === SESSION_COOKIE) return v.join("=");
+		if (k === name) return v.join("=");
 	}
 	return null;
 }

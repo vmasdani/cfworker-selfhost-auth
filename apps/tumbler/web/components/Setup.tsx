@@ -4,7 +4,7 @@ import { createVault } from "../lib/vault.ts";
 import { MIN_PASSWORD_LENGTH, MIN_PIN_LENGTH, validatePassword, validatePin } from "../lib/vault-core.ts";
 import { JoinForm, RecoverForm, RecoveryKeyView, SignInForm } from "./AccountForms.tsx";
 import { AuthScreen, ErrorText, PinInput } from "./common.tsx";
-import { Alert, Button, Checkbox, Field, Input } from "./ui/index.tsx";
+import { Alert, Button, Checkbox, Field, Input } from "@cfsa/ui";
 
 type Mode = "create" | "signin" | "join" | "recover";
 

@@ -79,6 +79,28 @@ export const APPS: AppDef[] = [
 		notes: ["Apply D1 migrations (apps/tumbler/migrations) before first use."],
 	},
 	{
+		id: "coffer",
+		name: "Coffer",
+		description: "Zero-knowledge secrets manager: projects, environments and a REST API with one-file clients (TS, Go, C#, PHP).",
+		source: { kind: "local", dir: "apps/coffer" },
+		cli: "cf",
+		workerName: "coffer",
+		variants: [
+			{
+				id: "default",
+				label: "D1",
+				resources: [{ type: "d1", name: "coffer-db", binding: "DB" }],
+				deploy: ["cf", "deploy"],
+			},
+		],
+		secrets: [
+			{ name: "SERVER_SECRET", generate: "random-base64-32", minLength: 32 },
+			{ name: "ADMIN_SETUP_TOKEN", generate: "random-base64-32", minLength: 32 },
+		],
+		firstAdmin: { kind: "setup-endpoint", command: "setup-admin --app coffer", tokenSecret: "ADMIN_SETUP_TOKEN" },
+		notes: ["Apply D1 migrations (apps/coffer/migrations) before first use."],
+	},
+	{
 		id: "nodewarden",
 		name: "NodeWarden",
 		description: "Third-party Bitwarden-compatible password manager server for Workers (official Bitwarden clients work).",

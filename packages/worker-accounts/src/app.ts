@@ -2,14 +2,32 @@ import { HttpError, findSession, readSessionCookie, serverKeys, type ServerKeys,
 import { Hono, type Context } from "hono";
 import { userById, type UserRow } from "./db.ts";
 
-export type Vars = { user: UserRow; session: SessionRow; keys: ServerKeys };
-export type AppEnv = { Bindings: Env; Variables: Vars };
+export interface AccountsConfig {
+	/** Shown in the login TOTP issuer, e.g. "Tumbler (host)". */
+	appName: string;
+	/** Session cookie name; must start with __Host-. */
+	cookie: string;
+	/** AAD namespace for the server-sealed login TOTP secret, e.g. "tumbler". Never change it once deployed. */
+	aadPrefix: string;
+}
+
+/** Bindings every app with accounts has. */
+export interface AccountsBindings {
+	DB: D1Database;
+	SERVER_SECRET: string;
+	ADMIN_SETUP_TOKEN: string;
+}
+
+export type Vars = { user: UserRow; session: SessionRow; keys: ServerKeys; cfg: AccountsConfig };
+export type AppEnv = { Bindings: AccountsBindings; Variables: Vars };
 export type Ctx = Context<AppEnv>;
 
-export function createApp() {
+export function createApp(cfg: AccountsConfig) {
+	if (!cfg.cookie.startsWith("__Host-")) throw new Error("Session cookie name must start with __Host-");
 	const app = new Hono<AppEnv>().basePath("/api");
 
 	app.use("*", async (c, next) => {
+		c.set("cfg", cfg);
 		// CSRF: state-changing requests must be same-origin JSON. Browsers send Origin on cross-site
 		// requests, and a cross-site form cannot send application/json without a CORS preflight.
 		if (c.req.method !== "GET" && c.req.method !== "HEAD") {
@@ -38,7 +56,7 @@ export function createApp() {
 
 /** Middleware: require a valid session; sets `user` and `session`. */
 export async function requireSession(c: Ctx, next: () => Promise<void>) {
-	const token = readSessionCookie(c.req.header("Cookie"));
+	const token = readSessionCookie(c.req.header("Cookie"), c.get("cfg").cookie);
 	const session = token ? await findSession(c.env.DB, token) : null;
 	if (!session) throw new HttpError(401, "unauthenticated");
 	const user = await userById(c.env.DB, session.user_id);

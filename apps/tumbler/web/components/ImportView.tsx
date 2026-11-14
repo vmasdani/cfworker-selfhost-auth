@@ -11,7 +11,7 @@ import { BackupPasswordError, isTumblerBackup, openBackup, type TumblerBackup } 
 import { importEntries, listEntries } from "../lib/vault.ts";
 import { QrScanner } from "./QrScanner.tsx";
 import { ErrorText, Hint, Page } from "./common.tsx";
-import { Alert, Badge, Button, buttonClass, Card, Field, Input, Tabs, Textarea } from "./ui/index.tsx";
+import { Alert, Badge, Button, buttonClass, Card, Field, Input, Tabs, Textarea } from "@cfsa/ui";
 import { CircleCheck, ClipboardPaste, FileUp, QrCode as QrCodeIcon, ScanLine, TriangleAlert } from "lucide-preact";
 
 interface Props {

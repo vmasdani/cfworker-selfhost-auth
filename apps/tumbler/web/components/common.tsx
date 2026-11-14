@@ -1,7 +1,7 @@
 import { ArrowLeft } from "lucide-preact";
 import type { ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
-import { Button, Card, cn, inputClass } from "./ui/index.tsx";
+import { Button, Card, cn, inputClass } from "@cfsa/ui";
 
 export function Brand({ subtitle }: { subtitle?: string }) {
 	return (

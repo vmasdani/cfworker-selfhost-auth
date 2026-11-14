@@ -26,6 +26,10 @@ Rules for AI agents and contributors working in this repository.
 - No dependency on a single third-party identity provider. Default auth is strong password + TOTP 2FA.
 - Strict CSP (`apps/*/public/_headers`), no third-party runtime scripts or CDNs.
 - Each app has its own Worker and its own D1 database. Share code via `packages/`, never data.
+  Accounts live in `packages/worker-accounts`; an app's cookie name and `aadPrefix` must never change once deployed.
+- Coffer: the SDK files in `apps/coffer/sdk/` must stay single-file and standard-library-only, and byte-compatible with
+  `apps/coffer/web/lib/keys.ts` (same HKDF info and AAD strings). Change the protocol only with a new version prefix
+  (`coffer/v2/...`) and run `scripts/sdk-matrix.ts` with every toolchain before committing SDK changes.
 
 ## Code
 - TypeScript, strict. `bun run typecheck` and `bun test` must pass before committing.

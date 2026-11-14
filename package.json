@@ -2,12 +2,18 @@
 	"name": "cfworker-selfhost-auth",
 	"private": true,
 	"type": "module",
-	"workspaces": ["apps/*", "packages/*", "installer"],
+	"workspaces": [
+		"apps/*",
+		"packages/*",
+		"installer"
+	],
 	"scripts": {
 		"test": "bun test",
 		"typecheck": "bun run --filter '*' typecheck",
 		"dev:tumbler": "bun run --cwd apps/tumbler dev",
-		"build:tumbler": "bun run --cwd apps/tumbler build"
+		"build:tumbler": "bun run --cwd apps/tumbler build",
+		"dev:coffer": "bun run --cwd apps/coffer dev",
+		"build:coffer": "bun run --cwd apps/coffer build"
 	},
 	"devDependencies": {
 		"@types/bun": "^1.4.4",

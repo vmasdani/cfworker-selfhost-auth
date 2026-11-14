@@ -1,7 +1,7 @@
 # Threat model
 
 ## Assets
-- TOTP secrets (Tumbler), application secrets (secrets manager).
+- TOTP secrets (Tumbler), application secrets (Coffer; its design and threats: [coffer.md](coffer.md)).
 - Master passwords, PINs, recovery keys, vault keys.
 - Session tokens.
 

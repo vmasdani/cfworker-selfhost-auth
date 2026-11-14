@@ -12,7 +12,7 @@ import type { Entry } from "../lib/entries.ts";
 import { deleteEntry, newEntryId, saveEntries } from "../lib/vault.ts";
 import { QrScanner } from "./QrScanner.tsx";
 import { ErrorText, Page } from "./common.tsx";
-import { Button, Card, Field, Input, Select, Tabs, Textarea } from "./ui/index.tsx";
+import { Button, Card, Field, Input, Select, Tabs, Textarea } from "@cfsa/ui";
 import { ChevronRight, KeyRound, Link2, ScanLine, Trash2 } from "lucide-preact";
 
 interface Props {

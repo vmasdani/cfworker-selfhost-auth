@@ -37,16 +37,16 @@ const ipLimit = (c: Ctx, scope: string, max = 20): Limit[] => [{ key: `${scope}:
 
 async function signIn(c: Ctx, user: UserRow) {
 	const { token } = await createSession(c.env.DB, user.id);
-	c.header("Set-Cookie", sessionCookie(token));
+	c.header("Set-Cookie", sessionCookie(token, c.get("cfg").cookie));
 	return c.json(accountResponse(user));
 }
 
-const totpAad = (userId: string) => `tumbler/login-totp/v1/${userId}`;
+const totpAad = (c: Ctx, userId: string) => `${c.get("cfg").aadPrefix}/login-totp/v1/${userId}`;
 
 /** Accepts the current, previous or next 30 s step, and never the same step twice. */
 async function checkLoginTotp(c: Ctx, user: UserRow, code: string): Promise<boolean> {
 	if (!user.login_totp_secret_enc || !/^\d{6}$/.test(code)) return false;
-	const secret = await c.get("keys").openSecret(JSON.parse(user.login_totp_secret_enc), totpAad(user.id));
+	const secret = await c.get("keys").openSecret(JSON.parse(user.login_totp_secret_enc), totpAad(c, user.id));
 	const key = await importOtpKey(base32Decode(secret));
 	const now = totpCounter(Date.now());
 	for (const step of [now, now - 1, now + 1]) {
@@ -119,10 +119,10 @@ export function authRoutes(app: Hono<AppEnv>) {
 	});
 
 	app.post("/logout", async (c) => {
-		const token = readSessionCookie(c.req.header("Cookie"));
+		const token = readSessionCookie(c.req.header("Cookie"), c.get("cfg").cookie);
 		const session = token ? await findSession(c.env.DB, token) : null;
 		if (session) await deleteSession(c.env.DB, session.id);
-		c.header("Set-Cookie", clearSessionCookie());
+		c.header("Set-Cookie", clearSessionCookie(c.get("cfg").cookie));
 		return c.json({ ok: true });
 	});
 
@@ -251,10 +251,10 @@ export function authRoutes(app: Hono<AppEnv>) {
 		const user = c.get("user");
 		if (user.login_totp_enabled) throw bad("totp_already_enabled");
 		const secret = base32Encode(randomBytes(20), { padding: false });
-		const sealed = await c.get("keys").sealSecret(secret, totpAad(user.id));
+		const sealed = await c.get("keys").sealSecret(secret, totpAad(c, user.id));
 		await c.env.DB.prepare("UPDATE users SET login_totp_secret_enc = ?, login_totp_last_counter = 0 WHERE id = ?")
 			.bind(JSON.stringify(sealed), user.id).run();
-		const issuer = `Tumbler (${new URL(c.req.url).host})`;
+		const issuer = `${c.get("cfg").appName} (${new URL(c.req.url).host})`;
 		const uri = formatOtpauthUri({ type: "totp", issuer, account: user.username, secret, algorithm: "SHA1", digits: 6, period: 30, counter: 0 });
 		return c.json({ secret, uri });
 	});

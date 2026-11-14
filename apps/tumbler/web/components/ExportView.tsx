@@ -7,7 +7,7 @@ import { MIN_PASSWORD_LENGTH, validatePassword } from "../lib/vault-core.ts";
 import { listEntries, verifyMasterPassword } from "../lib/vault.ts";
 import { ErrorText, Hint, Page } from "./common.tsx";
 import { QrCode } from "./QrCode.tsx";
-import { Alert, Button, Card, Checkbox, Field, Input, Select } from "./ui/index.tsx";
+import { Alert, Button, Card, Checkbox, Field, Input, Select } from "@cfsa/ui";
 
 type Format = "backup" | "proton" | "uri" | "google";
 

@@ -1,4 +1,6 @@
 @import "tailwindcss";
+/* Shared components live in packages/ui; let Tailwind scan them. */
+@source "../../../packages/ui/src";
 
 /* shadcn/ui theme tokens (neutral base, emerald primary). Dark mode follows the system. */
 :root {

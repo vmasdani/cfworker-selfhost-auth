@@ -6,7 +6,7 @@
 
 import { bad, bool, b64, int, obj, str } from "@cfsa/server-kit";
 import type { Hono } from "hono";
-import { body, requireSession, type AppEnv } from "./app.ts";
+import { body, requireSession, type AppEnv } from "@cfsa/worker-accounts";
 
 const MAX_CHANGES = 500;
 const PAGE = 500;

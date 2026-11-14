@@ -1,4 +1,5 @@
 // shadcn/ui components ported to Preact: same Tailwind class recipes, no React or Radix.
+// Apps must let Tailwind scan this folder: @source "../../../packages/ui/src"; in their CSS.
 
 import { clsx, type ClassValue } from "clsx";
 import type { ComponentChildren, ComponentProps } from "preact";
@@ -190,7 +191,8 @@ export function Alert({ variant = "default", icon, title, children, class: class
 		>
 			{icon}
 			{title && <div class="col-start-2 font-medium tracking-tight">{title}</div>}
-			{children && <div class="col-start-2 grid gap-1.5 text-sm leading-relaxed [&_ul]:list-disc [&_ul]:pl-4 [&_ul]:grid [&_ul]:gap-1">{children}</div>}
+			{/* Block flow (not grid), so mixed text and inline elements stay on one line. */}
+			{children && <div class="col-start-2 text-sm leading-relaxed [&>*+*]:mt-1.5 [&_ul]:list-disc [&_ul]:pl-4 [&_ul]:grid [&_ul]:gap-1">{children}</div>}
 		</div>
 	);
 }

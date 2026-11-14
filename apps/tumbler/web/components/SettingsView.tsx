@@ -5,7 +5,7 @@ import { MIN_PIN_LENGTH, validatePassword, validatePin } from "../lib/vault-core
 import { removePin, setPin, type Settings } from "../lib/vault.ts";
 import { AccountSection } from "./AccountSection.tsx";
 import { ErrorText, Hint, Page, PinInput, Section } from "./common.tsx";
-import { Badge, Button, Field, Input, Select, Switch } from "./ui/index.tsx";
+import { Badge, Button, Field, Input, Select, Switch } from "@cfsa/ui";
 
 interface Props {
 	settings: Settings;

@@ -1,6 +1,6 @@
 import { Camera, CameraOff, ImageUp } from "lucide-preact";
 import { useEffect, useRef, useState } from "preact/hooks";
-import { Button, buttonClass, cn } from "./ui/index.tsx";
+import { Button, buttonClass, cn } from "@cfsa/ui";
 import { decodeImageFile, drawToCanvas, getDecoder } from "../lib/qr.ts";
 
 interface Props {

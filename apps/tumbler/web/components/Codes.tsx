@@ -6,7 +6,7 @@ import { matchesQuery, type Entry } from "../lib/entries.ts";
 import { codeFor, entryCounter, formatCode } from "../lib/otp-keys.ts";
 import { listEntries, saveEntries, vaultEvents, type Settings } from "../lib/vault.ts";
 import { Avatar, Page, Timer, toast, useNow } from "./common.tsx";
-import { Button, cn, Input } from "./ui/index.tsx";
+import { Button, cn, Input } from "@cfsa/ui";
 
 interface Props {
 	settings: Settings;

@@ -1,13 +1,14 @@
 // Installer entry point. Apps it can install: ./apps.ts
 //
 // Commands:
-//   install (default)  Install or upgrade apps on a Cloudflare account (./install-tumbler.ts).
-//       [--profile <cf profile>] [--account <id>] [--apps tumbler,nodewarden] [--domain <host> | --no-domain]
+//   install (default)  Install or upgrade apps on a Cloudflare account (./install-local.ts).
+//       [--profile <cf profile>] [--account <id>] [--apps tumbler,coffer,nodewarden] [--domain <host> | --no-domain]
 //       [--variant kv|r2] [--dry-run] [--yes]
 //     Idempotent; re-running upgrades in place. Never deletes resources.
 //   nodewarden-claim --url <worker url> [--username <name or email>] [--name <display name>] [--yes]
-//   tumbler-setup-admin --url <worker url> [--username <name>] [--yes]
-//     Setup token from TUMBLER_SETUP_TOKEN, or prompted (hidden).
+//   setup-admin --app tumbler|coffer --url <worker url> [--username <name>] [--yes]
+//     Setup token from <APP>_SETUP_TOKEN (e.g. COFFER_SETUP_TOKEN), or prompted (hidden).
+//     `tumbler-setup-admin` is kept as an alias for `setup-admin --app tumbler`.
 // Missing values are prompted for interactively. Passwords are always typed by the user
 // (hidden, twice); on non-TTY stdin they are read as lines, e.g. for CI.
 //
@@ -17,20 +18,20 @@
 import { parseArgs } from "node:util";
 import { APPS } from "./apps.ts";
 import { installNodewarden, type NodewardenVariant } from "./install-nodewarden.ts";
-import { installTumbler, normalizeDomain } from "./install-tumbler.ts";
+import { installLocal, LOCAL_APPS, normalizeDomain, type LocalApp } from "./install-local.ts";
 import { CfError, cfRun, whoami, type CfContext } from "./lib/cf.ts";
 import { MIN_MASTER_PASSWORD_LENGTH, validateMasterPassword } from "./lib/password.ts";
 import { CancelledError, readHidden } from "./lib/tty.ts";
 import { assertClaimable, ClaimError, claimFirstAdmin, loginFromUsername, printClaimSummary } from "./nodewarden.ts";
-import { assertSetupNeeded, normalizeTumblerUsername, printTumblerSummary, setupTumblerAdmin } from "./tumbler.ts";
+import { assertSetupNeeded, normalizeUsername, printAdminSummary, setupAdmin } from "./local-admin.ts";
 
 const info = (msg: string) => process.stderr.write(`${msg}\n`);
 
 const USAGE = `Usage:
-  ./install.sh [install] [--profile <cf profile>] [--account <id>] [--apps tumbler,nodewarden]
+  ./install.sh [install] [--profile <cf profile>] [--account <id>] [--apps tumbler,coffer,nodewarden]
                [--domain <host> | --no-domain] [--variant kv|r2] [--dry-run] [--yes]
   ./install.sh nodewarden-claim [--url <worker url>] [--username <name or email>] [--name <display name>] [--yes]
-  ./install.sh tumbler-setup-admin [--url <worker url>] [--username <name>] [--yes]
+  ./install.sh setup-admin --app tumbler|coffer [--url <worker url>] [--username <name>] [--yes]
 
 Apps: ${APPS.map((a) => a.id).join(", ")}. --domain applies when installing one app; otherwise you are asked per app.`;
 
@@ -77,26 +78,30 @@ async function main(argv: string[]): Promise<number> {
 			printClaimSummary(result);
 			return 0;
 		}
+		case "setup-admin":
 		case "tumbler-setup-admin": {
 			const { values } = parseArgs({
 				args: rest,
-				options: { url: { type: "string" }, username: { type: "string" }, yes: { type: "boolean", short: "y" } },
+				options: { app: { type: "string" }, url: { type: "string" }, username: { type: "string" }, yes: { type: "boolean", short: "y" } },
 			});
-			const url = values.url ?? prompt("Tumbler URL:")?.trim();
+			const id = command === "tumbler-setup-admin" ? "tumbler" : (values.app ?? prompt("App (tumbler, coffer):", "coffer")?.trim() ?? "");
+			const app = LOCAL_APPS[id as LocalApp["id"]];
+			if (!app) throw new ClaimError(`--app must be one of: ${Object.keys(LOCAL_APPS).join(", ")}`);
+			const url = values.url ?? prompt(`${app.name} URL:`)?.trim();
 			if (!url) {
 				console.error(USAGE);
 				return 2;
 			}
-			await assertSetupNeeded(url);
-			const setupToken = process.env.TUMBLER_SETUP_TOKEN || (await readHidden("ADMIN_SETUP_TOKEN:"));
-			const username = normalizeTumblerUsername(values.username ?? prompt("Admin username:", "admin")?.trim() ?? "");
+			await assertSetupNeeded(app, url);
+			const setupToken = process.env[`${app.envPrefix}_SETUP_TOKEN`] || (await readHidden("ADMIN_SETUP_TOKEN:"));
+			const username = normalizeUsername(values.username ?? prompt("Admin username:", "admin")?.trim() ?? "");
 			const password = await readNewPassword(username);
-			if (!values.yes && prompt(`Create Tumbler admin "${username}" now? [y/N]`)?.trim().toLowerCase() !== "y") {
+			if (!values.yes && prompt(`Create ${app.name} admin "${username}" now? [y/N]`)?.trim().toLowerCase() !== "y") {
 				info("Aborted. Nothing was created.");
 				return 1;
 			}
 			info("Deriving keys and creating the admin account…");
-			printTumblerSummary(await setupTumblerAdmin({ url, setupToken, username, password }));
+			printAdminSummary(app, await setupAdmin(app, { url, setupToken, username, password }));
 			return 0;
 		}
 		default:
@@ -153,9 +158,9 @@ async function install(args: string[]): Promise<number> {
 	info(`✓ account: ${account.name}${profile ? ` (profile ${profile})` : ""}`);
 
 	// 2. apps
-	const apps = (values.apps ?? prompt("Apps to install (tumbler, nodewarden):", "tumbler") ?? "")
+	const apps = (values.apps ?? prompt("Apps to install (tumbler, coffer, nodewarden):", "tumbler") ?? "")
 		.split(",").map((a) => a.trim().toLowerCase()).filter(Boolean);
-	for (const a of apps) if (a !== "tumbler" && a !== "nodewarden") throw new ClaimError(`Unknown app: ${a}`);
+	for (const a of apps) if (!APPS.some((x) => x.id === a)) throw new ClaimError(`Unknown app: ${a}`);
 	if (!apps.length) throw new ClaimError("Nothing to install.");
 	const variant = (values.variant ?? "kv") as NodewardenVariant;
 	if (variant !== "kv" && variant !== "r2") throw new ClaimError("--variant must be kv or r2");
@@ -163,7 +168,7 @@ async function install(args: string[]): Promise<number> {
 	// 3. domains (--domain applies when installing a single app)
 	const domains: Record<string, string | undefined> = {};
 	for (const a of apps) {
-		const name = a === "tumbler" ? "Tumbler" : "NodeWarden";
+		const name = appName(a);
 		const input = values["no-domain"]
 			? ""
 			: ((apps.length === 1 ? values.domain : undefined) ??
@@ -173,7 +178,7 @@ async function install(args: string[]): Promise<number> {
 
 	info(`\nPlan: ${dryRun ? "DRY RUN, nothing is created or uploaded. " : ""}On "${account.name}":`);
 	for (const a of apps) {
-		info(`  • ${a === "tumbler" ? "Tumbler" : `NodeWarden (${variant.toUpperCase()} attachments)`} ${domains[a] ? `at https://${domains[a]}` : "on workers.dev"}`);
+		info(`  • ${a === "nodewarden" ? `NodeWarden (${variant.toUpperCase()} attachments)` : appName(a)} ${domains[a] ? `at https://${domains[a]}` : "on workers.dev"}`);
 	}
 	if (apps.includes("nodewarden") && !dryRun) {
 		info("  NodeWarden makes the first registered account the admin, so its admin is claimed right after deploy.");
@@ -184,27 +189,29 @@ async function install(args: string[]): Promise<number> {
 	}
 
 	for (const a of apps) {
-		info(`\n— ${a === "tumbler" ? "Tumbler" : "NodeWarden"} —`);
-		if (a === "tumbler") await installTumblerApp(ctx, domains[a], dryRun, !!values.yes);
-		else await installNodewardenApp(ctx, domains[a], variant, dryRun, !!values.yes);
+		info(`\n— ${appName(a)} —`);
+		if (a === "nodewarden") await installNodewardenApp(ctx, domains[a], variant, dryRun, !!values.yes);
+		else await installLocalApp(LOCAL_APPS[a as LocalApp["id"]], ctx, domains[a], dryRun, !!values.yes);
 	}
 	return 0;
 }
 
-async function installTumblerApp(ctx: CfContext, domain: string | undefined, dryRun: boolean, yes: boolean): Promise<void> {
-	const result = await installTumbler({ ctx, domain, dryRun, yes, confirm: yesNo, log: info });
+const appName = (id: string) => (id === "nodewarden" ? "NodeWarden" : (LOCAL_APPS[id as LocalApp["id"]]?.name ?? id));
+
+async function installLocalApp(app: LocalApp, ctx: CfContext, domain: string | undefined, dryRun: boolean, yes: boolean): Promise<void> {
+	const result = await installLocal(app, { ctx, domain, dryRun, yes, confirm: yesNo, log: info });
 	if (dryRun || !result.url) return;
 	const res = await fetch(`${result.url}/api/setup`);
 	const setup = (await res.json().catch(() => ({}))) as { needed?: boolean };
 	if (!setup.needed) {
-		info(`✓ Tumbler is up to date at ${result.url}. Accounts already exist; invite users from Settings → Sync.`);
+		info(`✓ ${app.name} is up to date at ${result.url}. Accounts already exist; invite users from ${app.inviteHint}.`);
 		return;
 	}
-	info("\nCreate the first Tumbler admin account.");
-	const username = normalizeTumblerUsername(prompt("Admin username:", "admin")?.trim() ?? "");
+	info(`\nCreate the first ${app.name} admin account.`);
+	const username = normalizeUsername(prompt("Admin username:", "admin")?.trim() ?? "");
 	const password = await readNewPassword(username);
 	info("Deriving keys and creating the admin account…");
-	printTumblerSummary(await setupTumblerAdmin({ url: result.url, setupToken: result.setupToken!, username, password }));
+	printAdminSummary(app, await setupAdmin(app, { url: result.url, setupToken: result.setupToken!, username, password }));
 }
 
 async function installNodewardenApp(ctx: CfContext, domain: string | undefined, variant: NodewardenVariant, dryRun: boolean, yes: boolean): Promise<void> {

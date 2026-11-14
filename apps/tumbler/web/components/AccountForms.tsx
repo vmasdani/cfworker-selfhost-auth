@@ -4,7 +4,7 @@ import { MIN_PASSWORD_LENGTH, validatePassword } from "../lib/vault-core.ts";
 import { copySecret } from "../lib/clipboard.ts";
 import * as vault from "../lib/vault.ts";
 import { ErrorText, Hint } from "./common.tsx";
-import { Alert, Button, Checkbox, Input, Label } from "./ui/index.tsx";
+import { Alert, Button, Checkbox, Input, Label } from "@cfsa/ui";
 import { Copy, TriangleAlert } from "lucide-preact";
 
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));

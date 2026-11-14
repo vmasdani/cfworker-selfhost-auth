@@ -4,7 +4,7 @@ import { getAccount } from "../lib/account.ts";
 import { PinError, unlockWithPassword, unlockWithPin } from "../lib/vault.ts";
 import { RecoverForm } from "./AccountForms.tsx";
 import { AuthScreen, ErrorText, PinInput } from "./common.tsx";
-import { Alert, Button, Field, Input } from "./ui/index.tsx";
+import { Alert, Button, Field, Input } from "@cfsa/ui";
 
 interface Props {
 	hasPin: boolean;

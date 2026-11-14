@@ -20,7 +20,7 @@ import { copySecret } from "../lib/clipboard.ts";
 import { JoinForm, RecoveryKeyView, SignInForm } from "./AccountForms.tsx";
 import { QrCode } from "./QrCode.tsx";
 import { ErrorText, Hint, Section } from "./common.tsx";
-import { Alert, Badge, Button, Checkbox, Field, Input, Select } from "./ui/index.tsx";
+import { Alert, Badge, Button, Checkbox, Field, Input, Select } from "@cfsa/ui";
 import { CircleCheck, Cloud, CloudOff, Copy, Link2, LogOut, RefreshCw, ShieldCheck, TriangleAlert, UserPlus } from "lucide-preact";
 
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
