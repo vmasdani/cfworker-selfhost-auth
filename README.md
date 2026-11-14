@@ -105,6 +105,8 @@ await coffer.writeSecret("API_TOKEN", "s3cr3t");
 
 Same API in [`coffer.go`](apps/coffer/sdk/coffer.go) (Go 1.24+), [`Coffer.cs`](apps/coffer/sdk/Coffer.cs) (.NET 8+) and [`Coffer.php`](apps/coffer/sdk/Coffer.php) (PHP 8.1+). Each file decrypts locally; the server only stores and serves ciphertext. Protocol and threat model: [docs/coffer.md](docs/coffer.md).
 
+Language not listed? Project → Integrate → **Other** gives a ready-made task for an AI coding agent (Claude Code, Codex, Cursor…): the protocol ([`sdk/PORTING.md`](apps/coffer/sdk/PORTING.md)), offline [test vectors](apps/coffer/sdk/test-vectors.json) and the TypeScript client as reference, with instructions to test before claiming it works.
+
 ## Development
 
 ```sh

@@ -63,6 +63,11 @@ The clients use only standard libraries: WebCrypto and fetch (TS), `crypto/hkdf`
 `HKDF`/`AesGcm`/`HttpClient` (.NET 8+), `hash_hkdf`/`openssl`/`curl` (PHP 8.1+). Python has no AES-GCM in its standard
 library, so a Python client would need the `cryptography` package.
 
+For other languages, `sdk/PORTING.md` is a task for an AI coding agent (the dashboard's Integrate → Other tab fills in
+the server URL and language and appends the test vectors and the TypeScript reference). `sdk/test-vectors.json` has
+fixed inputs and expected outputs for every derivation step; `scripts/test-vectors.ts` generates it with WebCrypto, and
+`sdk/test/vectors.test.ts` checks `coffer.ts` against it.
+
 ## Threats and mitigations
 
 | Threat | Mitigation | Residual risk |

@@ -1,13 +1,16 @@
-import { Alert, Button, Tabs } from "@cfsa/ui";
-import { Download, Info } from "lucide-preact";
+import { Alert, Button, Field, Input, Tabs } from "@cfsa/ui";
+import { Bot, Download, Info } from "lucide-preact";
 import { useState } from "preact/hooks";
 import goSource from "../../sdk/coffer.go?raw";
 import tsSource from "../../sdk/coffer.ts?raw";
 import csSource from "../../sdk/Coffer.cs?raw";
 import phpSource from "../../sdk/Coffer.php?raw";
+import porting from "../../sdk/PORTING.md?raw";
+import vectors from "../../sdk/test-vectors.json?raw";
 import { CopyButton, download, Hint, Section } from "./common.tsx";
 
 type Lang = "ts" | "go" | "cs" | "php";
+type Choice = Lang | "other";
 
 interface Sdk {
 	label: string;
@@ -19,7 +22,7 @@ interface Sdk {
 
 const SDKS: Record<Lang, Sdk> = {
 	ts: {
-		label: "TypeScript / JS",
+		label: "TS / JS",
 		file: "coffer.ts",
 		source: tsSource,
 		requires: "Node.js 20+, Bun, Deno, Cloudflare Workers or a browser. No packages. Node runs .ts directly (22.18+), or strip the types for plain JS.",
@@ -84,10 +87,10 @@ $coffer->writeSecret('LAST_DEPLOY', date(DATE_ATOM)); // read-write only`,
 const withUrl = (s: string) => s.replaceAll("__COFFER_URL__", location.origin);
 
 export function IntegrateTab() {
-	const [lang, setLang] = useState<Lang>("ts");
+	const [lang, setLang] = useState<Choice>("ts");
 	const [showSource, setShowSource] = useState(false);
-	const sdk = SDKS[lang];
-	const source = withUrl(sdk.source);
+	const sdk = lang === "other" ? null : SDKS[lang];
+	const source = sdk ? withUrl(sdk.source) : "";
 	const env = `COFFER_URL=${location.origin}\nCOFFER_CLIENT_ID=cfi_...\nCOFFER_CLIENT_SECRET=cfs_...\n`;
 
 	return (
@@ -103,7 +106,9 @@ export function IntegrateTab() {
 			</Section>
 
 			<Section title="2. Client file">
-				<Tabs value={lang} onChange={(v) => { setLang(v); setShowSource(false); }} items={(Object.keys(SDKS) as Lang[]).map((k) => ({ value: k, label: SDKS[k].label }))} />
+				<Tabs<Choice> value={lang} onChange={(v) => { setLang(v); setShowSource(false); }}
+					items={[...(Object.keys(SDKS) as Lang[]).map((k) => ({ value: k as Choice, label: SDKS[k].label })), { value: "other", label: "Other" }]} />
+				{sdk ? <>
 				<Hint>{sdk.requires}</Hint>
 				<div class="flex flex-wrap gap-2">
 					<Button onClick={() => download(sdk.file, source)}><Download /> Download {sdk.file}</Button>
@@ -113,12 +118,42 @@ export function IntegrateTab() {
 				{showSource && (
 					<pre class="bg-muted max-h-[32rem] overflow-auto rounded-lg px-4 py-3 font-mono text-xs leading-relaxed">{source}</pre>
 				)}
+				</> : <AgentPrompt />}
 			</Section>
 
-			<Section title="3. Use it">
+			{sdk && <Section title="3. Use it">
 				<pre class="bg-muted overflow-auto rounded-lg px-4 py-3 font-mono text-xs leading-relaxed">{sdk.usage}</pre>
 				<div><CopyButton value={sdk.usage} label="Copy example" secret={false} /></div>
-			</Section>
+			</Section>}
+		</div>
+	);
+}
+
+/** No client for the user's language: a self-contained task for an AI coding agent to write one. */
+function AgentPrompt() {
+	const [language, setLanguage] = useState("");
+	const target = language.trim() || "<your language>";
+	const prompt =
+		withUrl(porting).replaceAll("__LANGUAGE__", target) +
+		"\n## Test vectors (fixed test values, not real credentials)\n\n```json\n" + vectors.trim() + "\n```\n" +
+		"\n## Reference implementation (TypeScript, sdk/coffer.ts)\n\nPort its behavior, not its syntax.\n\n```ts\n" + withUrl(tsSource).trim() + "\n```\n";
+	return (
+		<div class="grid gap-4">
+			<Alert icon={<Bot />} title="Language not listed? Let your AI coding agent write the client.">
+				<p>
+					Copy this prompt into Claude Code, Codex, Cursor or another coding agent, inside your project. It contains the
+					protocol, offline test vectors and the TypeScript client as a reference, and asks the agent to test before claiming
+					it works. It contains no secrets.
+				</p>
+			</Alert>
+			<Field label="Language" htmlFor="ag-lang" hint="e.g. Python, Java, Kotlin, Ruby, Rust, Elixir, Swift, Dart">
+				<Input id="ag-lang" value={language} placeholder="Python" class="max-w-64" onInput={(e) => setLanguage(e.currentTarget.value)} />
+			</Field>
+			<div class="flex flex-wrap gap-2">
+				<CopyButton value={prompt} label="Copy prompt" secret={false} size="default" variant="default" />
+				<Button variant="outline" onClick={() => download("COFFER_CLIENT_TASK.md", prompt, "text/markdown")}><Download /> Download as .md</Button>
+			</div>
+			<pre class="bg-muted break-anywhere max-h-[28rem] overflow-auto rounded-lg px-4 py-3 font-mono text-xs leading-relaxed whitespace-pre-wrap">{prompt}</pre>
 		</div>
 	);
 }

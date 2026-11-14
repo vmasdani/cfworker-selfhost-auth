@@ -30,6 +30,7 @@ Rules for AI agents and contributors working in this repository.
 - Coffer: the SDK files in `apps/coffer/sdk/` must stay single-file and standard-library-only, and byte-compatible with
   `apps/coffer/web/lib/keys.ts` (same HKDF info and AAD strings). Change the protocol only with a new version prefix
   (`coffer/v2/...`) and run `scripts/sdk-matrix.ts` with every toolchain before committing SDK changes.
+  Keep `sdk/PORTING.md` (the AI-agent porting task) and `sdk/test-vectors.json` in step with the protocol.
 
 ## Code
 - TypeScript, strict. `bun run typecheck` and `bun test` must pass before committing.

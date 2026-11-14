@@ -1,0 +1,36 @@
+{
+	"description": "Coffer v1 client protocol test vectors. HKDF = HKDF-SHA256, 32 zero-byte salt, 32-byte output. Hex values are lowercase; base64 is standard with padding; ct = ciphertext || 16-byte GCM tag.",
+	"input": {
+		"clientId": "cfi_AAECAwQFBgcICQoLDA0ODw",
+		"clientSecret": "cfs_EBESExQVFhcYGRobHB0eHyAhIiMkJSYnKCkqKywtLi8",
+		"envId": "6f1c2a4e-8b3d-4c5e-9f60-7a8b9c0d1e2f",
+		"envKeyHex": "404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f",
+		"name": "DATABASE_URL",
+		"value": "postgres://app:pä$$ \"w0rd\"@db.internal:5432/app\nline 2 ✓",
+		"wrapIvB64": "AAECAwQFBgcICQoL",
+		"secretIvB64": "DA0ODxAREhMUFRYX"
+	},
+	"expected": {
+		"authKeyB64": "B35QukoZif2P6BQCNrZ3aOSFM8BrpkDAIgHm1wTynnY=",
+		"authorizationHeader": "Bearer cfi_AAECAwQFBgcICQoLDA0ODw.B35QukoZif2P6BQCNrZ3aOSFM8BrpkDAIgHm1wTynnY=",
+		"wrapKeyHex": "227de95de991b57a3367d81228afa8e4a4ebcfea515cd81c730f2e50b419b6cb",
+		"wrappedKey": {
+			"iv": "AAECAwQFBgcICQoL",
+			"ct": "BCSYCmXiGP+tH8ZaLWp9TfeUuE7BE3qVD/o9Oa10UQ4cidA+z769/UuRnUhhHwmx"
+		},
+		"encKeyHex": "4c668192c592f6801a2d739451bcbff8fdf88b1240748882320e1bb4d15627f9",
+		"indexKeyHex": "0c80c4c5b70544eabb31bcd46fdd040657ae93b8c9694fc2aa266349bb3669e3",
+		"mac": "03ecab3d8230abf291a48bbde6ac8652d5377c7800e6922bcd1bf6351eb0ef05",
+		"plaintextJson": "{\"name\":\"DATABASE_URL\",\"value\":\"postgres://app:pä$$ \\\"w0rd\\\"@db.internal:5432/app\\nline 2 ✓\"}",
+		"secret": {
+			"mac": "03ecab3d8230abf291a48bbde6ac8652d5377c7800e6922bcd1bf6351eb0ef05",
+			"iv": "DA0ODxAREhMUFRYX",
+			"ct": "pIbvGz8EnsjUhnjmOz+gOlxP84UgEGAb0kEtC6FULyDbdzSyRyW96YYOPESZRrGX8etGPX+Wa8g6rCYHzJIjAkrQRYCh3wFVIGR0cU4skM7sRYnhzlutD78BRieczH1iTn3jrq4KQH5Lnuvs1hQPlA=="
+		}
+	},
+	"notes": [
+		"GET /api/v1/identity would return { envId, wrappedKey } with these values; decrypting wrappedKey with wrapKey and AAD 'coffer/v1/machine-key/<clientId>' must give envKeyHex.",
+		"GET /api/v1/secrets would return { secrets: [secret] }; decrypting it must give plaintextJson, whose name hashes to mac.",
+		"Encryption uses a random IV in real use. To compare ciphertext byte for byte, encrypt plaintextJson with the fixed secretIv; JSON from your language may escape differently, which is fine as long as other clients decode it."
+	]
+}
