@@ -2,6 +2,7 @@
 	"name": "@cfsa/tumbler",
 	"private": true,
 	"type": "module",
+	"main": "server.ts",
 	"scripts": {
 		"dev": "cf dev",
 		"build": "cf build",
@@ -9,12 +10,15 @@
 		"db:migrate:local": "bun run scripts/migrate-local.ts",
 		"test:api": "bun run scripts/api-smoke.ts",
 		"icons": "bun run scripts/build-icons.ts",
-		"typecheck": "cf workers types && tsc -p tsconfig.worker.json && tsc -p tsconfig.web.json"
+		"typecheck": "cf workers types && tsc -p tsconfig.worker.json && tsc -p tsconfig.web.json && tsc -p tsconfig.server.json",
+		"build:standalone": "STANDALONE=1 vite build",
+		"start": "bun run server.ts"
 	},
 	"dependencies": {
 		"@cfsa/crypto": "workspace:*",
 		"@cfsa/importers": "workspace:*",
 		"@cfsa/server-kit": "workspace:*",
+		"@cfsa/standalone": "workspace:*",
 		"@cfsa/totp": "workspace:*",
 		"@cfsa/ui": "workspace:*",
 		"@cfsa/worker-accounts": "workspace:*",
@@ -31,6 +35,7 @@
 		"@preact/preset-vite": "^2.10.6",
 		"@resvg/resvg-js": "^2.6.2",
 		"@tailwindcss/vite": "^4.3.5",
+		"@types/bun": "^1.4.4",
 		"cf": "^1.0.0-beta.31",
 		"tailwindcss": "^4.3.5",
 		"typescript": "^7.0.2",

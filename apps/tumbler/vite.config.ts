@@ -30,6 +30,9 @@ function serviceWorker(): Plugin {
 	};
 }
 
+// STANDALONE=1 (bun run build:standalone) builds only the web app into dist/ for the Bun server.
+const standalone = process.env.STANDALONE === "1";
+
 export default defineConfig({
-	plugins: [preact(), tailwindcss(), cloudflare(), serviceWorker()],
+	plugins: [preact(), tailwindcss(), ...(standalone ? [] : [cloudflare()]), serviceWorker()],
 });

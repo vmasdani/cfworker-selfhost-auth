@@ -14,5 +14,11 @@ dist/
 tumbler-backup-*.json
 tumbler-export-*
 
+# Standalone mode: SQLite databases and generated secrets
+data/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
 # Installer working directory (cloned third-party apps)
 .installer/

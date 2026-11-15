@@ -24,6 +24,7 @@
 |---|---|---|
 | D1 database leaked | Only ciphertext and HMAC verifiers stored | Offline guessing of weak passwords; enforce strong passwords |
 | Worker code compromised / Cloudflare account takeover | Hardware key on Cloudflare account, scoped API tokens | Attacker can serve malicious JS that captures passwords. Same as any web vault |
+| Standalone host compromised (Bun + SQLite mode) | Bind to 127.0.0.1 behind a TLS proxy, `data/` and `server-secret` mode 0600/0700, keep the OS patched | Same as a Worker compromise, plus the attacker gets `SERVER_SECRET` with the database: offline guessing of weak passwords without the pepper barrier. No platform DDoS/WAF unless you add one |
 | Online password guessing | Per-username and per-IP failure limits (D1), optional login TOTP with replay protection | A correct password with a missing TOTP code is distinguishable from a wrong password |
 | Stolen session cookie | HttpOnly + SameSite=Strict, sign out, password change revokes other sessions | Session works until it expires or is revoked; the vault stays encrypted without the password |
 | Malicious or compromised admin | Admin cannot read anyone's vault (zero-knowledge); can only create/revoke invites | A server operator can serve modified JavaScript (see Worker compromise) |

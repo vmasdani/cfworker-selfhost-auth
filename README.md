@@ -86,6 +86,33 @@ COFFER_SETUP_TOKEN=<token>  ./install.sh setup-admin --app coffer  --url https:/
 
 You choose the username and password; keys are derived locally and the recovery key is printed once. The setup endpoint works only while the server has no users. Everyone else joins with single-use invite links (Tumbler: Settings → Sync → Invite users; Coffer: Account → Invite users).
 
+## Standalone mode (Bun + SQLite, no Cloudflare)
+
+Tumbler and Coffer also run as plain Bun processes with a local SQLite file, for a VPS or home server. The same Worker code runs unchanged: `packages/standalone` gives it a D1-compatible database over `bun:sqlite` (WAL, foreign keys on, `batch` as one transaction), applies `migrations/` on every start, and serves the built web app with its `_headers` (CSP and the rest), SPA fallback, ETags and precompressed brotli/gzip.
+
+```sh
+bun install
+bun run build:standalone          # web apps into apps/<app>/dist
+pm2 start ecosystem.config.cjs    # tumbler on 127.0.0.1:8701, coffer on 127.0.0.1:8702
+pm2 save && pm2 startup           # start on boot
+# without pm2:
+bun run start:tumbler             # or: cd apps/tumbler && bun run .
+```
+
+- **HTTPS is required.** Sessions use a `__Host-` cookie, which browsers keep only over https (or on localhost). Put Caddy, nginx or Cloudflare Tunnel in front, and set `PUBLIC_URL` to the public origin (in `apps/<app>/.env`, or `TUMBLER_PUBLIC_URL=… COFFER_PUBLIC_URL=… pm2 start ecosystem.config.cjs`). It is used for the same-origin (CSRF) check.
+- **Client IPs** (for login rate limits) come from the rightmost `X-Forwarded-For` entry when bound to loopback (the default `HOST=127.0.0.1`), or from `CLIENT_IP_HEADER` (e.g. `CF-Connecting-IP` behind Cloudflare Tunnel). Set `TRUST_PROXY=0` if nothing in front sets these headers.
+- **Secrets.** On first start `SERVER_SECRET` is generated into `$DATA_DIR/server-secret` (mode 0600; default `data/<app>/` under the repo with pm2, `./data` otherwise). It never rotates: every login verifier depends on it, so back it up together with the database. While the server has no users, a fresh one-time setup token is written to `$DATA_DIR/admin-setup-token` on every start; the log prints the command that creates the first admin, e.g.
+
+  ```sh
+  TUMBLER_SETUP_TOKEN="$(cat data/tumbler/admin-setup-token)" ./install.sh setup-admin --app tumbler --url https://tumbler.example.com
+  ```
+
+  The token file is deleted on the next start after the first admin exists.
+- **One process per app.** SQLite has one writer: keep pm2 in fork mode with one instance (as in `ecosystem.config.cjs`). On SIGINT/SIGTERM the server finishes open requests and closes the database.
+- **Backups:** `sqlite3 data/tumbler/tumbler.sqlite ".backup tumbler-$(date +%F).sqlite"` (safe while running), plus `server-secret`.
+
+All settings: [`packages/standalone/src/server.ts`](packages/standalone/src/server.ts). The end-to-end API checks run against it too: `bun run test:api http://localhost:8701 "$(cat data/tumbler/admin-setup-token)"` on an empty database.
+
 ## Coffer in your apps
 
 Create a client ID for one environment (project → Access), put the three values in your app's environment, and add one file from project → Integrate (it has your server URL filled in). No packages:
@@ -143,8 +170,10 @@ packages/totp/       RFC 6238 TOTP engine
 packages/importers/  Proton Authenticator, Google Authenticator, otpauth URI import/export
 packages/server-kit/ sessions, rate limiting, validation, SERVER_SECRET keys
 packages/worker-accounts/ accounts for app Workers: setup, login + TOTP, invites, recovery (Hono)
+packages/standalone/ standalone mode: Bun server, D1-compatible bun:sqlite adapter, static files (Bun-only)
 packages/ui/         shadcn/ui components ported to Preact, shared by the apps
 installer/           interactive installer (run via ./install.sh)
+ecosystem.config.cjs pm2 processes for standalone mode
 ```
 
 Agents and contributors: read [AGENTS.md](AGENTS.md).

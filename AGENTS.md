@@ -5,6 +5,7 @@ Rules for AI agents and contributors working in this repository.
 ## Tooling
 - **Bun** is the package manager, script runner and test runner (`bun install`, `bun run`, `bun test`).
 - **Worker code runs on workerd, not Bun.** Do not use Bun-only APIs (`Bun.*`, `bun:*`) under `apps/*/worker/` or in packages imported by Workers. Use Web APIs and WebCrypto.
+- **Standalone mode** (`packages/standalone`, `apps/*/server.ts`, `ecosystem.config.cjs`) runs the same Worker code on Bun + SQLite. It is Bun-only: never import it from Worker code. Worker code must keep using only the D1 API subset in `packages/standalone/src/d1.ts` (extend the adapter, with tests, if you need more), and must not rely on Cloudflare-only request data beyond `CF-Connecting-IP`, which the standalone server sets.
 - **Cloudflare: use the `cf` CLI.** Projects are configured with `cloudflare.config.ts`. Do not add `wrangler.jsonc`/`wrangler.toml`. For commands `cf` does not support yet (live logs, single secrets), use `npx wrangler ... --name <worker>` without adding Wrangler to the project.
 - Discover `cf` commands with `cf cli search "<task>"` and preview with `--dry-run`. Do not guess flags from memory.
 

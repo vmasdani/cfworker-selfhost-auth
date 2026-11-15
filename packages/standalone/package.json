@@ -1,0 +1,14 @@
+{
+	"name": "@cfsa/standalone",
+	"private": true,
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"scripts": {
+		"typecheck": "tsc -p ."
+	},
+	"devDependencies": {
+		"@types/bun": "^1.4.4"
+	}
+}
