@@ -9,15 +9,20 @@ declare const process: { env: Record<string, string | undefined> };
 //   CLOUDFLARE_ACCOUNT_ID  account to deploy to
 //   TUMBLER_D1_ID          D1 database ID (found or created by the installer)
 //   TUMBLER_DOMAIN         optional custom domain, e.g. tumbler.example.com (zone must be in the account)
+//   TUMBLER_RUST=1         build the Rust port (rs/, run `worker-build --release` there first) as the separate
+//                          Worker "tumbler-rs" with database "tumbler-rs-db". Proof of concept only: never set it
+//                          for the production Worker. TUMBLER_D1_ID and TUMBLER_DOMAIN must then name the copy.
 const d1Id = process.env.TUMBLER_D1_ID || undefined;
 const domain = process.env.TUMBLER_DOMAIN || undefined;
+const rust = process.env.TUMBLER_RUST === "1";
 
 export default defineConfig({
 	accountId: process.env.CLOUDFLARE_ACCOUNT_ID || undefined,
 	worker: {
-		name: "tumbler",
+		name: rust ? "tumbler-rs" : "tumbler",
 		compatibilityDate: "2026-11-01",
-		entrypoint,
+		// The cast keeps binding types inferred from the TS Worker (a plain string union makes them circular).
+		entrypoint: rust ? ("./rs/build/index.js" as unknown as typeof entrypoint) : entrypoint,
 		assets: {
 			// Static PWA is served directly; only /api/* reaches the Worker.
 			notFoundHandling: "single-page-application",
@@ -26,7 +31,7 @@ export default defineConfig({
 		// With a custom domain, serve only there: one origin for cookies and CSP.
 		...(domain ? { domains: [domain], workersDev: false } : {}),
 		env: {
-			DB: bindings.d1({ name: "tumbler-db", ...(d1Id ? { id: d1Id } : {}) }),
+			DB: bindings.d1({ name: rust ? "tumbler-rs-db" : "tumbler-db", ...(d1Id ? { id: d1Id } : {}) }),
 			// Server-side pepper: HMAC key for auth verifiers and decoy pre-login salts,
 			// and encryption key for account-login TOTP secrets. Must never change after install.
 			SERVER_SECRET: bindings.secret(),

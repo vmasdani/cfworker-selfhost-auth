@@ -37,3 +37,13 @@ Rules for AI agents and contributors working in this repository.
 - TypeScript, strict. `bun run typecheck` and `bun test` must pass before committing.
 - Crypto and TOTP code must have tests, including RFC 6238 test vectors.
 - Keep dependencies minimal; justify any new runtime dependency.
+
+## Rust port (`crates/`, `apps/*/rs`; see `docs/rust-port.md`)
+- Experimental and not deployed; the TypeScript backends are the reference. Do not extend it unless asked.
+- It is a byte-compatible port of the TypeScript backends: same routes, SQL, status codes, JSON, cookie names,
+  AAD and HKDF strings, and stored formats. A change to one implementation's behaviour must be made in both.
+- `cargo test --workspace`, `cargo clippy --workspace --all-targets` (also `--target wasm32-unknown-unknown`
+  for `apps/*/rs`) and `bun scripts/rust-parity.ts <app>` for every app must pass before committing.
+- New migrations go in `apps/<app>/migrations/` as usual and in that app's `MIGRATIONS` list (a test checks).
+- Workers builds use `worker-build` and the app's `cloudflare.config.ts` (`TUMBLER_RUST=1` for `tumbler-rs`);
+  never deploy the Rust build under the production Worker name or database without an explicit request.

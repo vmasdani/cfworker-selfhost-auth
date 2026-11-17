@@ -1,0 +1,47 @@
+# systemd unit for Coffer standalone (Bun + SQLite), instead of pm2.
+# Copy to /etc/systemd/system/coffer.service, adjust paths and PUBLIC_URL, then:
+#   sudo systemctl daemon-reload && sudo systemctl enable --now coffer
+# Logs: journalctl -u coffer. Same for Tumbler (port 8701, its own user and data directory).
+#
+# The app directory holds the bundled server.js, migrations/ and dist/ (bun run build:standalone),
+# or a repo checkout with ExecStart=/usr/local/bin/bun apps/coffer/server.ts.
+
+[Unit]
+Description=Coffer standalone (Bun)
+After=network.target
+
+[Service]
+User=coffer
+Group=coffer
+WorkingDirectory=/opt/coffer/app
+ExecStart=/usr/local/bin/bun server.js
+Environment=NODE_ENV=production
+Environment=HOST=127.0.0.1
+Environment=PORT=8702
+Environment=DATA_DIR=/opt/coffer/data
+Environment=PUBLIC_URL=https://coffer.example.com
+Environment=TRUST_PROXY=1
+Environment=CLIENT_IP_HEADER=CF-Connecting-IP
+# The app directory is read-only; do not let Bun try to write a transpiler cache.
+Environment=BUN_RUNTIME_TRANSPILER_CACHE_PATH=0
+# SIGTERM: the server finishes open requests and closes the database.
+KillSignal=SIGTERM
+TimeoutStopSec=10
+Restart=on-failure
+RestartSec=1
+MemoryMax=300M
+# Hardening: only the data directory is writable. No MemoryDenyWriteExecute: Bun's JIT needs it off.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ReadWritePaths=/opt/coffer/data
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+LockPersonality=yes
+
+[Install]
+WantedBy=multi-user.target

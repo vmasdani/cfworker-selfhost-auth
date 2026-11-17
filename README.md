@@ -99,6 +99,8 @@ pm2 save && pm2 startup           # start on boot
 bun run start:tumbler             # or: cd apps/tumbler && bun run .
 ```
 
+On a small server, prefer systemd to pm2: the pm2 daemon and pm2-logrotate took about 167 MB next to a 58 MB Coffer process on a 2 GB box. [`deploy/coffer.service.example`](deploy/coffer.service.example) is a hardened unit (only the data directory is writable, logs in `journalctl -u coffer`); the same unit works for Tumbler with its own port, user and data directory.
+
 - **HTTPS is required.** Sessions use a `__Host-` cookie, which browsers keep only over https (or on localhost). Put Caddy, nginx or Cloudflare Tunnel in front, and set `PUBLIC_URL` to the public origin (in `apps/<app>/.env`, or `TUMBLER_PUBLIC_URL=… COFFER_PUBLIC_URL=… pm2 start ecosystem.config.cjs`). It is used for the same-origin (CSRF) check.
 - **Client IPs** (for login rate limits) come from the rightmost `X-Forwarded-For` entry when bound to loopback (the default `HOST=127.0.0.1`), or from `CLIENT_IP_HEADER` (e.g. `CF-Connecting-IP` behind Cloudflare Tunnel). Set `TRUST_PROXY=0` if nothing in front sets these headers.
 - **Secrets.** On first start `SERVER_SECRET` is generated into `$DATA_DIR/server-secret` (mode 0600; default `data/<app>/` under the repo with pm2, `./data` otherwise). It never rotates: every login verifier depends on it, so back it up together with the database. While the server has no users, a fresh one-time setup token is written to `$DATA_DIR/admin-setup-token` on every start; the log prints the command that creates the first admin, e.g.
@@ -108,10 +110,26 @@ bun run start:tumbler             # or: cd apps/tumbler && bun run .
   ```
 
   The token file is deleted on the next start after the first admin exists.
-- **One process per app.** SQLite has one writer: keep pm2 in fork mode with one instance (as in `ecosystem.config.cjs`). On SIGINT/SIGTERM the server finishes open requests and closes the database.
+- **One process per app.** SQLite has one writer: keep pm2 in fork mode with one instance (as in `ecosystem.config.cjs`), or one systemd service per app. On SIGINT/SIGTERM the server finishes open requests and closes the database.
 - **Backups:** `sqlite3 data/tumbler/tumbler.sqlite ".backup tumbler-$(date +%F).sqlite"` (safe while running), plus `server-secret`.
 
 All settings: [`packages/standalone/src/server.ts`](packages/standalone/src/server.ts). The end-to-end API checks run against it too: `bun run test:api http://localhost:8701 "$(cat data/tumbler/admin-setup-token)"` on an empty database.
+
+## Rust backends (experimental, not deployed)
+
+`crates/` and `apps/<app>/rs` hold a Rust port of the Tumbler and Coffer backends: a Worker built with [workers-rs](https://github.com/cloudflare/workers-rs) (wasm32, D1) and a native standalone binary (hyper, bundled SQLite). It is byte-compatible with the TypeScript backends (same routes, SQL, status codes, JSON, cookies, stored formats), so either one runs on the other's database. The web apps and SDKs stay TypeScript. It was a proof of concept: a separate `tumbler-rs` Worker on a copy of the database passed the end-to-end tests, Coffer passed the SDK matrix (including the C# client), and both are removed again. Details: [docs/rust-port.md](docs/rust-port.md).
+
+**Not worth it for a single-user, self-hosted install.** The TypeScript backends stay the reference. Caveats:
+
+- **Two implementations.** Every backend change has to be made in both and pass `scripts/rust-parity.ts`. That roughly doubles backend work, for people and for AI agents. Keep one backend per app.
+- **Little gain on Workers.** The apps mostly wait on D1, so requests are not faster. Crypto runs in wasm (RustCrypto) instead of native WebCrypto, and the Worker grows to about 600 KB.
+- **The standalone gain is real but small.** Rust Coffer: 3.6 MB RSS against 58 MB for Bun, 27 ms against 54 ms for 300 requests. Most of the memory saving on a small box comes from dropping pm2 (about 167 MB), which systemd does for the Bun server too.
+- **Toolchain.** rustup, the `wasm32-unknown-unknown` and `x86_64-unknown-linux-musl` targets, `worker-build` (its version must match the `worker` crate), and a musl C compiler for the bundled SQLite. Builds are slower than `bun run build`.
+- **No shared types** between the TypeScript web apps and a Rust API; generate them (e.g. `ts-rs`) if the port is ever adopted.
+- **Secrets cannot be read back.** A Worker's `SERVER_SECRET` is write-only, so a second Worker (like `tumbler-rs`) gets its own secret and copied accounts cannot log in there. Replacing the code of the same Worker keeps its secret.
+- Migrations stay in `d1_migrations` (cf CLI and the Bun server use it), not `sqlx`'s own table.
+
+Rust pays off for CPU-bound work: native servers with tight memory or latency limits, or Workers doing heavy compute (image processing, parsing, compression, KDFs WebCrypto lacks).
 
 ## Coffer in your apps
 
@@ -174,6 +192,8 @@ packages/standalone/ standalone mode: Bun server, D1-compatible bun:sqlite adapt
 packages/ui/         shadcn/ui components ported to Preact, shared by the apps
 installer/           interactive installer (run via ./install.sh)
 ecosystem.config.cjs pm2 processes for standalone mode
+deploy/              systemd units for standalone mode
+crates/, apps/*/rs/  experimental Rust port of the backends (see docs/rust-port.md)
 ```
 
 Agents and contributors: read [AGENTS.md](AGENTS.md).

@@ -22,3 +22,7 @@ data/
 
 # Installer working directory (cloned third-party apps)
 .installer/
+
+# Rust build output
+/target/
+/apps/*/rs/build/

@@ -1,0 +1,29 @@
+# Rust port of the app backends (proof of concept, alongside the TypeScript Workers).
+#
+#   crates/core         platform-independent: crypto, TOTP, validation, accounts, sessions, rate limits
+#   crates/standalone   native server: SQLite (rusqlite), static files, hyper (replaces packages/standalone)
+#   apps/<app>/rs       app routes; builds as a Worker (wasm32, workers-rs) and as a native binary
+#
+# Wire formats, SQL and stored data are byte-compatible with the TypeScript implementation.
+
+[workspace]
+resolver = "2"
+members = ["crates/core", "crates/standalone", "apps/tumbler/rs", "apps/coffer/rs"]
+
+[workspace.package]
+edition = "2024"
+license = "MIT"
+publish = false
+
+[workspace.dependencies]
+cfsa-core = { path = "crates/core" }
+cfsa-standalone = { path = "crates/standalone" }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+worker = { version = "0.9", features = ["d1"] }
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = "debuginfo"

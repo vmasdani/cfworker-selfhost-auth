@@ -1,0 +1,44 @@
+# systemd unit for the Rust standalone Coffer server (replaces pm2 + Bun for Coffer).
+# Copy to /etc/systemd/system/coffer-rs.service, set PUBLIC_URL, then:
+#   sudo systemctl daemon-reload && sudo systemctl enable --now coffer-rs
+# Logs: journalctl -u coffer-rs. See docs/rust-port.md for the cutover from pm2.
+
+[Unit]
+Description=Coffer standalone (Rust)
+After=network.target
+
+[Service]
+User=coffer
+Group=coffer
+WorkingDirectory=/opt/coffer/app-rs
+# Static files are read from dist/ next to the binary (or STATIC_DIR); migrations are embedded.
+ExecStart=/opt/coffer/app-rs/coffer-server
+Environment=NODE_ENV=production
+Environment=HOST=127.0.0.1
+Environment=PORT=8702
+Environment=DATA_DIR=/opt/coffer/data
+Environment=PUBLIC_URL=https://coffer.example.com
+Environment=TRUST_PROXY=1
+Environment=CLIENT_IP_HEADER=CF-Connecting-IP
+# SIGTERM: finish open requests, PRAGMA optimize, exit (within 8 s).
+KillSignal=SIGTERM
+TimeoutStopSec=10
+Restart=on-failure
+RestartSec=1
+MemoryMax=128M
+# Hardening: only the data directory is writable.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ReadWritePaths=/opt/coffer/data
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+
+[Install]
+WantedBy=multi-user.target
